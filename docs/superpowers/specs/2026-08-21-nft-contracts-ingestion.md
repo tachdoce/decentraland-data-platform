@@ -31,7 +31,9 @@ Lambda load_nft_contracts
       unparseable ISO dates; duplicate (chain_id, contract_address) pairs.
    3. write ONE parquet to bronze/nft_contracts/dt=<upload date UTC>/
    ▼
-Glue table bronze.nft_contracts (partition projection on dt, like dcl_contracts)
+Glue table bronze.nft_contracts (no partition projection: the Lambda runs
+ALTER TABLE ADD IF NOT EXISTS PARTITION after each snapshot, since updates
+are infrequent and the catalog should list only real partitions)
    ▼
 silver (later phase): nft_contracts_current (latest dt) + nft_contracts_history
 ```
@@ -77,9 +79,12 @@ fetches only the missing history.
 - Lambda `load-nft-contracts`: Python 3.13, zip + AWSSDKPandas layer (same
   packaging as extract-dcl-contracts), timeout 60 s, memory 512 MB.
 - IAM: `s3:GetObject` on `landing/nft_contracts/*`, `s3:PutObject` on
-  `bronze/nft_contracts/*`, basic logging. Nothing else.
-- Glue table `bronze.nft_contracts` with dt partition projection
-  (range `2026-08-01,NOW`).
+  `bronze/nft_contracts/*`, basic logging; plus the minimum for the
+  partition DDL: Athena start/get on the tagged workgroup, Glue
+  get/create-partition on catalog+database+table, and read/write on
+  `athena-results/*`.
+- Glue table `bronze.nft_contracts`; partitions registered explicitly by
+  the Lambda via Athena DDL in workgroup `decentraland-data-platform`.
 - CloudWatch log group, 7-day retention.
 - No EventBridge schedule — the S3 event IS the trigger.
 

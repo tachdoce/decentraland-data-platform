@@ -3,13 +3,11 @@ resource "aws_glue_catalog_table" "nft_contracts" {
   name          = "nft_contracts"
   table_type    = "EXTERNAL_TABLE"
 
+  # No partition projection here: snapshots are infrequent, so the Lambda
+  # registers each partition explicitly (ALTER TABLE ADD PARTITION) and the
+  # catalog lists exactly the partitions that really exist.
   parameters = {
-    "classification"            = "parquet"
-    "projection.enabled"        = "true"
-    "projection.dt.type"        = "date"
-    "projection.dt.format"      = "yyyy-MM-dd"
-    "projection.dt.range"       = "2026-08-01,NOW"
-    "storage.location.template" = "s3://${local.bucket_name}/bronze/nft_contracts/dt=$${dt}/"
+    "classification" = "parquet"
   }
 
   partition_keys {

@@ -111,10 +111,30 @@ def test_rows_to_parquet_roundtrip(tmp_path):
     assert str(table.schema.field("extract_from_dt").type) == "date32[day]"
 
 
+class FakeAthena:
+    """Records DDL statements and reports a fixed terminal state."""
+
+    def __init__(self, queries, state="SUCCEEDED"):
+        self.queries = queries
+        self.state = state
+
+    def start_query_execution(self, QueryString, WorkGroup):
+        self.queries.append({"ddl": QueryString, "workgroup": WorkGroup})
+        return {"QueryExecutionId": "fake-query-id"}
+
+    def get_query_execution(self, QueryExecutionId):
+        return {
+            "QueryExecution": {
+                "Status": {"State": self.state, "StateChangeReason": "fake reason"}
+            }
+        }
+
+
 def test_handler_reads_event_and_writes_partition(monkeypatch, tmp_path):
     import ingestion.nft_contracts.handler as h
 
     written = {}
+    queries = []
 
     class FakeS3:
         def get_object(self, Bucket, Key):
@@ -125,7 +145,11 @@ def test_handler_reads_event_and_writes_partition(monkeypatch, tmp_path):
         def put_object(self, Bucket, Key, Body):
             written["bucket"], written["key"], written["body"] = Bucket, Key, Body
 
-    monkeypatch.setattr(h.boto3, "client", lambda service: FakeS3())
+    monkeypatch.setattr(
+        h.boto3,
+        "client",
+        lambda service: FakeAthena(queries) if service == "athena" else FakeS3(),
+    )
     event = {
         "Records": [
             {
@@ -144,3 +168,23 @@ def test_handler_reads_event_and_writes_partition(monkeypatch, tmp_path):
     assert result["s3_key"] == written["key"]
     assert result["source_key"] == "landing/nft_contracts/nft_contracts.csv"
     assert len(written["body"]) > 1000  # real parquet bytes
+
+    # The partition DDL ran, on the right table/path, in the tagged workgroup
+    assert len(queries) == 1
+    ddl = queries[0]["ddl"]
+    assert "ALTER TABLE bronze.nft_contracts" in ddl
+    assert "ADD IF NOT EXISTS PARTITION" in ddl
+    dt = written["key"].split("dt=")[1].split("/")[0]
+    assert f"(dt = '{dt}')" in ddl
+    assert f"LOCATION 's3://test-bucket/bronze/nft_contracts/dt={dt}/'" in ddl
+    assert queries[0]["workgroup"] == "decentraland-data-platform"
+
+
+def test_register_partition_raises_on_failed_ddl(monkeypatch):
+    import ingestion.nft_contracts.handler as h
+
+    monkeypatch.setattr(
+        h.boto3, "client", lambda service: FakeAthena([], state="FAILED")
+    )
+    with pytest.raises(RuntimeError, match="FAILED.*fake reason"):
+        h.register_partition(datetime.date(2026, 8, 21), "test-bucket")
