@@ -19,7 +19,8 @@ tagging) that every later component reuses.
 
 ## Behavior
 
-`extract_dcl_contracts` Lambda, triggered daily by EventBridge:
+`extract_dcl_contracts` Lambda, invoked manually (Step Functions will
+schedule it from phase 8):
 
 1. **Extract**: GET `addresses.json`. The response contains 7 networks; only
    `mainnet` and `matic` are kept.
@@ -66,8 +67,10 @@ Base (shared by the whole platform, created in this phase):
 
 - S3 bucket `decentraland-data-platform-${account_id}` (private, versioning
   off, lifecycle rules deferred).
-- Glue database `bronze`; Glue table `dcl_contracts` with partition
-  projection on `dt` (format `yyyy-MM-dd`) so no crawler/MSCK is needed.
+- Glue database `bronze`; Glue table `dcl_contracts`; partitions registered
+  explicitly by the Lambda via ALTER TABLE ADD IF NOT EXISTS PARTITION in
+  workgroup `decentraland-data-platform` (same pattern as nft_contracts; no
+  crawler/MSCK needed in steady state).
 - Athena workgroup `decentraland-data-platform` with results prefix and
   `bytes_scanned_cutoff`.
 
@@ -76,9 +79,10 @@ Component:
 - Lambda `extract-dcl-contracts`: Python 3.13, zip packaging if `pyarrow`
   fits the 250 MB limit (container image as fallback), timeout 60 s,
   memory 512 MB. Tags: `component=ingestion-dcl-contracts`, `layer=bronze`.
-- IAM role: `s3:PutObject` on `bronze/dcl_contracts/*` only, plus basic
-  logging. No other permissions.
-- EventBridge rule: daily 06:00 UTC.
+- IAM role: `s3:PutObject` on `bronze/dcl_contracts/*`, the Athena/Glue
+  permissions for partition DDL, plus basic logging.
+- No EventBridge trigger: orchestration arrives with Step Functions
+  (phase 8); until then, manual invokes.
 - CloudWatch log group, 7-day retention.
 
 ## Repo layout

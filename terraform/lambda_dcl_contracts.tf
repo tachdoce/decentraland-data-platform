@@ -24,6 +24,14 @@ data "archive_file" "dcl_contracts_zip" {
     content  = ""
     filename = "ingestion/dcl_contracts/__init__.py"
   }
+  source {
+    content  = file("${path.module}/../ingestion/common/partitions.py")
+    filename = "ingestion/common/partitions.py"
+  }
+  source {
+    content  = ""
+    filename = "ingestion/common/__init__.py"
+  }
 }
 
 resource "aws_iam_role" "dcl_contracts" {
@@ -46,11 +54,47 @@ resource "aws_iam_role_policy" "dcl_contracts_s3" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "s3:PutObject"
-      Resource = "${aws_s3_bucket.lake.arn}/bronze/dcl_contracts/*"
-    }]
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.lake.arn}/bronze/dcl_contracts/*"
+      },
+      # Athena writes DDL query results with the caller's credentials
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetBucketLocation", "s3:ListBucket"]
+        Resource = aws_s3_bucket.lake.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject"]
+        Resource = "${aws_s3_bucket.lake.arn}/athena-results/*"
+      },
+      # Run ALTER TABLE ADD PARTITION in the tagged workgroup
+      {
+        Effect   = "Allow"
+        Action   = ["athena:StartQueryExecution", "athena:GetQueryExecution"]
+        Resource = aws_athena_workgroup.main.arn
+      },
+      # Athena DDL resolves the table and creates the partition through Glue
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:GetDatabase",
+          "glue:GetTable",
+          "glue:GetPartition",
+          "glue:GetPartitions",
+          "glue:CreatePartition",
+          "glue:BatchCreatePartition",
+        ]
+        Resource = [
+          "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:catalog",
+          aws_glue_catalog_database.bronze.arn,
+          aws_glue_catalog_table.dcl_contracts.arn,
+        ]
+      }
+    ]
   })
 }
 
@@ -80,27 +124,11 @@ resource "aws_lambda_function" "dcl_contracts" {
   layers      = [local.sdk_pandas_layer_arn]
 
   environment {
-    variables = { LAKE_BUCKET = aws_s3_bucket.lake.bucket }
+    variables = {
+      LAKE_BUCKET      = aws_s3_bucket.lake.bucket
+      ATHENA_WORKGROUP = aws_athena_workgroup.main.name
+    }
   }
 
   depends_on = [aws_cloudwatch_log_group.dcl_contracts]
-}
-
-resource "aws_cloudwatch_event_rule" "dcl_contracts_daily" {
-  name                = "extract-dcl-contracts-daily"
-  schedule_expression = "cron(0 6 * * ? *)"
-  tags                = local.dcl_contracts_tags
-}
-
-resource "aws_cloudwatch_event_target" "dcl_contracts" {
-  rule = aws_cloudwatch_event_rule.dcl_contracts_daily.name
-  arn  = aws_lambda_function.dcl_contracts.arn
-}
-
-resource "aws_lambda_permission" "dcl_contracts_events" {
-  statement_id  = "AllowEventBridge"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.dcl_contracts.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.dcl_contracts_daily.arn
 }

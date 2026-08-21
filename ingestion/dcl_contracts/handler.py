@@ -10,6 +10,7 @@ import boto3
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ingestion.common.partitions import register_partition
 from ingestion.dcl_contracts.transform import flatten, partition_key, validate_payload
 
 ADDRESSES_URL = "https://contracts.decentraland.org/addresses.json"
@@ -46,10 +47,6 @@ def handler(event, context):
             run_date = datetime.date.fromisoformat(event["date"])
         except ValueError:
             raise ValueError(f"event 'date' must be YYYY-MM-DD, got: {event['date']!r}")
-        if run_date < datetime.date(2026, 8, 1):
-            raise ValueError(
-                f"event 'date' {run_date} predates the table's partition projection range (2026-08-01)"
-            )
     else:
         run_date = datetime.datetime.now(datetime.timezone.utc).date()
 
@@ -58,8 +55,8 @@ def handler(event, context):
     rows = flatten(data)
 
     key = partition_key(run_date)
-    boto3.client("s3").put_object(
-        Bucket=os.environ["LAKE_BUCKET"], Key=key, Body=rows_to_parquet(rows)
-    )
-    print(f"wrote {len(rows)} rows to s3://{os.environ['LAKE_BUCKET']}/{key}")
+    bucket = os.environ["LAKE_BUCKET"]
+    boto3.client("s3").put_object(Bucket=bucket, Key=key, Body=rows_to_parquet(rows))
+    register_partition("dcl_contracts", run_date, bucket)
+    print(f"wrote {len(rows)} rows to s3://{bucket}/{key}")
     return {"rows": len(rows), "s3_key": key}

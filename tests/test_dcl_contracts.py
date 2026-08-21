@@ -144,3 +144,39 @@ def test_fetch_raises_on_invalid_json(monkeypatch):
     )
     with pytest.raises(ValueError):
         fetch()
+
+
+def test_handler_writes_snapshot_and_registers_partition(monkeypatch):
+    import ingestion.common.partitions as p
+    import ingestion.dcl_contracts.handler as h
+    from tests.test_partitions import FakeAthena
+
+    written = {}
+    queries = []
+
+    class FakeS3:
+        def put_object(self, Bucket, Key, Body):
+            written["bucket"], written["key"], written["body"] = Bucket, Key, Body
+
+    def mock_boto3_client(service):
+        if service == "s3":
+            return FakeS3()
+        else:
+            return FakeAthena(queries)
+
+    monkeypatch.setenv("LAKE_BUCKET", "test-bucket")
+    monkeypatch.setattr(h, "fetch", lambda: FIXTURE)
+    monkeypatch.setattr(h.boto3, "client", mock_boto3_client)
+    monkeypatch.setattr(p.boto3, "client", mock_boto3_client)
+
+    # A date before 2026-08-01 must now be accepted: the projection range
+    # floor is gone along with the projection itself.
+    result = h.handler({"date": "2025-01-15"}, None)
+
+    assert written["key"] == "bronze/dcl_contracts/dt=2025-01-15/contracts.parquet"
+    assert result["s3_key"] == written["key"]
+    assert len(queries) == 1
+    ddl = queries[0]["ddl"]
+    assert "ALTER TABLE bronze.dcl_contracts" in ddl
+    assert "ADD IF NOT EXISTS PARTITION (dt = '2025-01-15')" in ddl
+    assert "LOCATION 's3://test-bucket/bronze/dcl_contracts/dt=2025-01-15/'" in ddl

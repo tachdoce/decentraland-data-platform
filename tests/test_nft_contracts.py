@@ -145,11 +145,13 @@ def test_handler_reads_event_and_writes_partition(monkeypatch, tmp_path):
         def put_object(self, Bucket, Key, Body):
             written["bucket"], written["key"], written["body"] = Bucket, Key, Body
 
-    monkeypatch.setattr(
-        h.boto3,
-        "client",
-        lambda service: FakeAthena(queries) if service == "athena" else FakeS3(),
-    )
+    def fake_client(service):
+        if service == "s3":
+            return FakeS3()
+        else:
+            return FakeAthena(queries)
+
+    monkeypatch.setattr(h.boto3, "client", fake_client)
     event = {
         "Records": [
             {
@@ -178,13 +180,3 @@ def test_handler_reads_event_and_writes_partition(monkeypatch, tmp_path):
     assert f"(dt = '{dt}')" in ddl
     assert f"LOCATION 's3://test-bucket/bronze/nft_contracts/dt={dt}/'" in ddl
     assert queries[0]["workgroup"] == "decentraland-data-platform"
-
-
-def test_register_partition_raises_on_failed_ddl(monkeypatch):
-    import ingestion.nft_contracts.handler as h
-
-    monkeypatch.setattr(
-        h.boto3, "client", lambda service: FakeAthena([], state="FAILED")
-    )
-    with pytest.raises(RuntimeError, match="FAILED.*fake reason"):
-        h.register_partition(datetime.date(2026, 8, 21), "test-bucket")

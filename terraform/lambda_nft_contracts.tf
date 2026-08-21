@@ -22,6 +22,14 @@ data "archive_file" "nft_contracts_zip" {
     content  = ""
     filename = "ingestion/nft_contracts/__init__.py"
   }
+  source {
+    content  = file("${path.module}/../ingestion/common/partitions.py")
+    filename = "ingestion/common/partitions.py"
+  }
+  source {
+    content  = ""
+    filename = "ingestion/common/__init__.py"
+  }
 }
 
 resource "aws_iam_role" "nft_contracts" {
