@@ -2,3 +2,5 @@ pytest==8.*
 pyarrow==21.*
 boto3==1.*
 ruff==0.*
+dbt-core==1.12.*
+dbt-athena==1.11.*

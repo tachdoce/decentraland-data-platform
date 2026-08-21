@@ -1,0 +1,13 @@
+# No secrets here: authentication comes from the AWS CLI profile/credentials
+# chain (terraform-admin user). Safe to commit.
+decentraland:
+  target: dev
+  outputs:
+    dev:
+      type: athena
+      region_name: us-east-1
+      work_group: decentraland-data-platform
+      s3_staging_dir: s3://decentraland-data-platform-683569194224/athena-results/
+      database: awsdatacatalog
+      schema: silver
+      threads: 4

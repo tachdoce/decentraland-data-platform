@@ -1,0 +1,41 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Raw layer, written by the ingestion Lambdas. Glue database `bronze`.
+    database: awsdatacatalog
+    schema: bronze
+    tables:
+      - name: dcl_contracts
+        description: >
+          Daily full snapshot of the official Decentraland contract registry
+          (contracts.decentraland.org/addresses.json). Partitioned by dt
+          (partition projection).
+        columns:
+          - name: chain_id
+            description: EIP-155 numeric chain id (1=ethereum, 137=polygon).
+          - name: contract_address
+            description: Contract address, lowercase.
+          - name: contract_name
+            description: Contract name as published in the registry.
+          - name: dt
+            description: Snapshot date partition (YYYY-MM-DD).
+
+      - name: nft_contracts
+        description: >
+          Hand-curated NFT contract list ingested from reference/ via
+          landing/ -> Lambda -> bronze snapshot. Partitions registered
+          explicitly by the Lambda.
+        columns:
+          - name: chain_id
+            description: EIP-155 numeric chain id (1=ethereum, 137=polygon).
+          - name: contract_address
+            description: Contract address, lowercase.
+          - name: contract_name
+            description: Curated contract name.
+          - name: first_mint_dt
+            description: Date of the contract's first mint.
+          - name: extract_from_dt
+            description: Start date for the on-chain backfill of this contract.
+          - name: dt
+            description: Snapshot date partition (YYYY-MM-DD).
