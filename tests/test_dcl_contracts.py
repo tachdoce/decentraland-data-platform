@@ -18,7 +18,7 @@ FIXTURE = json.loads(
 
 def test_flatten_keeps_only_mainnet_and_matic():
     rows = flatten(FIXTURE)
-    assert set(r["chain_id"] for r in rows) == {1, 137}
+    assert {r["chain_id"] for r in rows} == {1, 137}
     assert len(rows) == len(FIXTURE["mainnet"]) + len(FIXTURE["matic"])
 
 
@@ -92,7 +92,6 @@ def test_rows_to_parquet_roundtrip(tmp_path):
 
 
 def test_fetch_sends_explicit_user_agent(monkeypatch):
-    import io
     import urllib.request
     from unittest.mock import MagicMock
 

@@ -17,7 +17,7 @@ FIXTURE_BYTES = (
 def test_real_reference_file_parses():
     rows = parse_and_validate(FIXTURE_BYTES)
     assert len(rows) == 830
-    assert set(r["chain_id"] for r in rows) == {1, 137}
+    assert {r["chain_id"] for r in rows} == {1, 137}
     first = rows[0]
     assert isinstance(first["chain_id"], int)
     assert isinstance(first["first_mint_dt"], datetime.date)
