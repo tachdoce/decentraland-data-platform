@@ -1,0 +1,2 @@
+# provided by AWSSDKPandas Lambda layer: pyarrow
+# provided by Lambda runtime: boto3
