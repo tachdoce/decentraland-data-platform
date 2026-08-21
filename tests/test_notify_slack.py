@@ -42,6 +42,27 @@ OK_MESSAGE = json.dumps(
 )
 
 
+DBT_FAILED_MESSAGE = json.dumps(
+    {
+        "source": "dbt",
+        "component": "dbt build",
+        "status": "FAILED",
+        "detail": "Failure in test assert_dim_contracts_unique_key (dbt/tests)",
+        "execution_url": "https://us-east-1.console.aws.amazon.com/cloudwatch/logs/dbt",
+    }
+)
+
+DBT_INFO_MESSAGE = json.dumps(
+    {
+        "source": "dbt",
+        "component": "dim_contracts_changes",
+        "status": "INFO",
+        "detail": "3 contract changes: 2 added, 1 removed",
+        "execution_url": "https://us-east-1.console.aws.amazon.com/athena/dim_contracts_changes",
+    }
+)
+
+
 def sns_event(message: str) -> dict:
     return {"Records": [{"Sns": {"Message": message}}]}
 
@@ -81,6 +102,51 @@ def test_long_reason_is_truncated():
     alarm["NewStateReason"] = "x" * 2000
     payload = build_payload(json.dumps(alarm))
     assert len(all_text(payload)) < 2000
+
+
+def test_custom_failed_message_builds_red_payload():
+    payload = build_payload(DBT_FAILED_MESSAGE)
+    attachment = payload["attachments"][0]
+    assert attachment["color"] == "#d62d20"
+    text = all_text(payload)
+    assert "Unrecognized" not in text
+    assert "dbt build" in text
+    assert "assert_dim_contracts_unique_key" in text
+    assert "console.aws.amazon.com/cloudwatch/logs/dbt" in text
+
+
+def test_custom_info_message_builds_non_red_payload():
+    payload = build_payload(DBT_INFO_MESSAGE)
+    attachment = payload["attachments"][0]
+    assert attachment["color"] != "#d62d20"
+    text = all_text(payload)
+    assert "dim_contracts_changes" in text
+    assert "2 added, 1 removed" in text
+    assert "athena/dim_contracts_changes" in text
+
+
+def test_custom_message_with_other_status_is_skipped():
+    message = json.loads(DBT_INFO_MESSAGE)
+    message["status"] = "SUCCEEDED"
+    assert build_payload(json.dumps(message)) is None
+
+
+def test_custom_message_without_execution_url_still_renders():
+    message = json.loads(DBT_INFO_MESSAGE)
+    del message["execution_url"]
+    payload = build_payload(json.dumps(message))
+    text = all_text(payload)
+    assert "Unrecognized" not in text
+    assert "dim_contracts_changes" in text
+
+
+def test_custom_long_detail_is_truncated():
+    message = json.loads(DBT_FAILED_MESSAGE)
+    message["detail"] = "x" * 2000
+    payload = build_payload(json.dumps(message))
+    text = all_text(payload)
+    assert "Unrecognized" not in text
+    assert len(text) < 2000
 
 
 @patch("alerts.notify_slack.handler.urllib.request.urlopen")

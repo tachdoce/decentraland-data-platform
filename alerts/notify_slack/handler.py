@@ -1,8 +1,11 @@
 """notify-slack Lambda: SNS alerts topic -> Slack Incoming Webhook.
 
-Subscribed to the alerts SNS topic. Understands CloudWatch Alarm
-notifications; anything else is forwarded as raw text so an unexpected
-payload never gets lost. Only failures (state ALARM) are posted.
+Subscribed to the alerts SNS topic. Understands two shapes:
+- CloudWatch Alarm notifications: only failures (state ALARM) are posted.
+- Custom pipeline contract {source, component, status, detail,
+  execution_url?}: FAILED posts red, INFO posts blue, others skipped.
+Anything else is forwarded as raw text so an unexpected payload never
+gets lost.
 """
 
 import json
@@ -18,6 +21,7 @@ WEBHOOK_SSM_PARAM = os.environ.get(
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 MAX_REASON_CHARS = 500
 RED = "#d62d20"
+BLUE = "#439fe0"
 
 _webhook_cache = None
 
@@ -89,10 +93,54 @@ def _alarm_payload(alarm: dict) -> dict | None:
     return {"attachments": [{"color": RED, "blocks": blocks}]}
 
 
+def _custom_payload(message: dict) -> dict | None:
+    """Pipeline contract: {source, component, status, detail, execution_url?}.
+
+    FAILED -> red alert, INFO -> blue notification, anything else skipped.
+    """
+    status = message["status"]
+    if status not in ("FAILED", "INFO"):
+        return None
+
+    color, icon, kind = (
+        (RED, "🔴", "Pipeline failure")
+        if status == "FAILED"
+        else (BLUE, "ℹ️", "Pipeline notification")
+    )
+    component = message.get("component", "unknown")
+    detail = message.get("detail", "")[:MAX_REASON_CHARS]
+
+    blocks = [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": f"{icon} {kind}: {component}"},
+        },
+        {
+            "type": "section",
+            "fields": [
+                {"type": "mrkdwn", "text": f"*Source:*\n{message.get('source', 'unknown')}"},
+                {"type": "mrkdwn", "text": f"*Status:*\n{status}"},
+            ],
+        },
+        {"type": "section", "text": {"type": "mrkdwn", "text": detail}},
+    ]
+    execution_url = message.get("execution_url")
+    if execution_url:
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": f"<{execution_url}|View execution>"}],
+            }
+        )
+    return {"attachments": [{"color": color, "blocks": blocks}]}
+
+
 def build_payload(message: str) -> dict | None:
     """Turn an SNS message into a Slack payload, or None to skip (non-failure)."""
     try:
         parsed = json.loads(message)
+        if isinstance(parsed, dict) and "source" in parsed and "status" in parsed:
+            return _custom_payload(parsed)
         assert isinstance(parsed, dict) and "AlarmName" in parsed
     except (ValueError, AssertionError):
         # Unknown payload: never drop an alert on the floor

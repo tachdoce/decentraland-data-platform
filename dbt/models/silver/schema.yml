@@ -17,3 +17,21 @@ models:
       - name: contract_address
         data_tests:
           - not_null
+
+  - name: dim_contracts_changes
+    description: >
+      One row per contract change between the latest and previous snapshots.
+      Consumed by the pipeline notifier: rows present after a build trigger
+      an INFO Slack notification. Empty means no changes.
+    columns:
+      - name: change_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["added", "removed", "renamed"]
+      - name: chain_id
+        data_tests:
+          - not_null
+      - name: contract_address
+        data_tests:
+          - not_null
