@@ -82,12 +82,19 @@ alongside verdicts and test purity.
 
 ## 6. Reference data
 
-`reference/` at the repo root holds **hand-curated** data only (chains
-dimension, general marketplace contracts, asset categories, event
-signatures). Consumers: dbt via `seed-paths: ["../reference"]` (no local
-`dbt/seeds/`), and Lambdas by copying `reference/` into their images at build
-time. Data with a live official source enters through the pipeline as a
-source, never as repo reference.
+`reference/` at the repo root holds **hand-curated** data only (contract
+dictionary, chains dimension, general marketplace contracts, asset
+categories, event signatures). Git is the source of truth; **publishing** a
+curated file means uploading it to the lake's `landing/<name>/` prefix,
+where an S3 event notification triggers an ingestion Lambda that validates
+it and writes a dated parquet snapshot to bronze — the same snapshot+`dt`
+pattern as pipeline sources (first instance: `nft_contracts`, spec
+`2026-08-21-nft-contracts-ingestion.md`). Downstream consumers (dbt models,
+extraction Lambdas) read from the lake, never from files baked into images.
+Tiny static dimensions with no snapshot value (e.g. `chains.csv`) may
+instead be materialized as dbt seeds via `seed-paths: ["../reference"]`
+(no local `dbt/seeds/`). Data with a live official source enters through
+the pipeline as a source, never as repo reference.
 
 ## 7. Ingestion structure
 
@@ -152,17 +159,20 @@ analysis, and an "About" page with the architecture diagram.
 
 ## 13. Build order
 
-1. **Phase 1**: base Terraform (bucket, Glue database, Athena workgroup,
-   tagging) + `extract_dcl_contracts` Lambda → first table in bronze
-   (spec: `2026-08-21-dcl-contracts-extraction.md`).
-2. On-chain Lambdas (BigQuery → bronze), reading contracts from the S3
-   snapshot.
-3. Prices Lambda (CoinGecko → bronze).
-4. Decode Lambda → staging.
-5. dbt: silver + tests.
-6. dbt: gold + platinum export.
-7. Step Functions + EventBridge.
-8. Dashboard + README with diagram.
+1. **Phase 1 — DONE**: base Terraform (bucket, Glue database, Athena
+   workgroup, tagging) + `extract_dcl_contracts` Lambda → first table in
+   bronze (spec: `2026-08-21-dcl-contracts-extraction.md`).
+2. **Phase 2**: event-driven `nft_contracts` ingestion (landing/ upload →
+   Lambda → bronze snapshot; spec `2026-08-21-nft-contracts-ingestion.md`).
+3. On-chain Lambdas (BigQuery → bronze), reading contract lists and
+   per-contract `extract_from_dt` backfill ranges from the S3 snapshots.
+4. Prices Lambda (CoinGecko → bronze).
+5. Decode Lambda → staging.
+6. dbt: silver + tests (incl. contracts current/history and the unified
+   `silver.contracts` view).
+7. dbt: gold + platinum export.
+8. Step Functions + EventBridge.
+9. Dashboard + README with diagram.
 
 Each phase gets its own component spec in this folder and its own
 implementation plan in `docs/superpowers/plans/`.

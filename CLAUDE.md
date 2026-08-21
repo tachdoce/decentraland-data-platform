@@ -18,9 +18,9 @@ public dashboard. Target budget: ~$0/month (free tiers).
 | Folder | Role |
 |---|---|
 | `terraform/` | All infrastructure (S3, Lambdas, Step Functions, Glue/Athena, IAM, SNS) |
-| `ingestion/onchain/` (common/ + one folder per chain), `ingestion/dcl_contracts/`, `ingestion/prices/` | Extraction Lambdas → bronze |
+| `ingestion/onchain/` (common/ + one folder per chain), `ingestion/dcl_contracts/`, `ingestion/nft_contracts/`, `ingestion/prices/` | Extraction/ingestion Lambdas → bronze |
 | `decode/` | Python Lambda bronze → staging (ABI decoding with eth_abi) |
-| `reference/` | Hand-curated reference CSVs (chains, general marketplaces, categories) — consumed by dbt via seed-paths and copied into Lambda images |
+| `reference/` | Hand-curated CSVs (git = source of truth). Publishing = upload to `landing/<name>/` in S3 → event Lambda → bronze snapshot. Never baked into images |
 | `dbt/` | dbt-athena project: staging → silver → gold (no local seeds/ — uses ../reference) |
 | `platinum_export/` | Lambda gold → platinum |
 | `dashboard/` | Streamlit app |
@@ -65,8 +65,10 @@ Conversation language: Spanish.
 
 New designs are validated section by section and stored in
 `docs/superpowers/specs/`; each spec yields a plan in `docs/superpowers/plans/`
-executed with checkpoints. Agreed build order: 1) base Terraform +
-`extract_dcl_contracts` Lambda (addresses.json → bronze snapshot), 2) on-chain
-Lambdas (read contract list from the S3 snapshot), 3) prices Lambda,
-4) decode, 5) dbt silver, 6) gold+platinum, 7) Step Functions,
-8) dashboard+README.
+executed with checkpoints. Build order: 1) base Terraform +
+`extract_dcl_contracts` (DONE — deployed, daily 06:00 UTC), 2) event-driven
+`nft_contracts` ingestion (landing→Lambda→bronze), 3) on-chain Lambdas
+(contract lists + per-contract `extract_from_dt` backfill from S3
+snapshots), 4) prices, 5) decode, 6) dbt silver (incl. unified
+`silver.contracts` view), 7) gold+platinum, 8) Step Functions,
+9) dashboard+README.
