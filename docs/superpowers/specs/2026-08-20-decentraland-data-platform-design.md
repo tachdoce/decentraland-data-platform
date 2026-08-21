@@ -1,129 +1,128 @@
-# Decentraland Data Platform — Diseño
+# Decentraland Data Platform — Design
 
-**Fecha:** 2026-08-20 (actualizado 2026-08-21 con capa staging y Lambda decode)
-**Estado:** validado por secciones en conversación; pendiente revisión final del documento
+**Date:** 2026-08-20 (updated 2026-08-21 with staging layer and decode Lambda)
+**Status:** validated section by section in conversation; pending final document review
 
-## 1. Objetivo
+## 1. Goal
 
-Proyecto de portfolio de data engineering. Pipeline serverless en AWS que:
-extrae datos on-chain de Decentraland (logs crudos de contratos en Ethereum y
-Polygon) y precios del token MANA, los procesa en una arquitectura medallion
-(bronze/staging/silver/gold/platinum) y los sirve en un dashboard público.
+Data engineering portfolio project. A serverless pipeline on AWS that extracts
+Decentraland on-chain data (raw contract logs on Ethereum and Polygon) and MANA
+token prices, processes them through a medallion architecture
+(bronze/staging/silver/gold/platinum), and serves them in a public dashboard.
 
-Restricciones: costo ~$0/mes (free tiers de AWS, GCP y Streamlit), todo
-reproducible desde el repo (Terraform), y maximizar valor demostrable en
-entrevistas (decodificación ABI propia, dbt, Step Functions, Terraform, CI/CD).
+Constraints: ~$0/month cost (AWS, GCP, and Streamlit free tiers), fully
+reproducible from the repo (Terraform), and maximum interview value
+(own ABI decoding, dbt, Step Functions, Terraform, CI/CD).
 
-## 2. Fuentes de datos
+## 2. Data sources
 
-- **On-chain**: BigQuery public datasets `crypto_ethereum` y `crypto_polygon`.
-  Query filtrada por direcciones de contratos de Decentraland (Marketplace v1/v2,
-  LANDRegistry, EstateRegistry, colecciones de wearables, Bids, tienda de
-  colecciones en Polygon) y por partición de fecha. Los logs vienen crudos
-  (topics/data en hex) — la decodificación es nuestra. Free tier permanente de
-  BigQuery: 1 TB de queries/mes; la extracción diaria consume GBs.
-- **Precios**: CoinGecko API pública — OHLCV/market data diaria de MANA.
+- **On-chain**: BigQuery public datasets `crypto_ethereum` and `crypto_polygon`.
+  Queries filtered by Decentraland contract addresses (Marketplace v1/v2,
+  LANDRegistry, EstateRegistry, wearable collections, Bids, Polygon collection
+  store) and by date partition. Logs arrive raw (hex topics/data) — decoding is
+  ours. BigQuery permanent free tier: 1 TB of queries/month; the daily
+  extraction consumes GBs.
+- **Prices**: public CoinGecko API — daily MANA OHLCV/market data.
 
-## 3. Data lake medallion (un solo bucket S3)
+## 3. Medallion data lake (single S3 bucket)
 
-| Capa | Contenido | Quién escribe |
+| Layer | Content | Written by |
 |---|---|---|
-| `bronze/onchain_logs/chain=<c>/dt=<d>/` | logs hex crudos, parquet | Lambda `extract_onchain` |
-| `bronze/mana_prices/dt=<d>/` | respuesta CoinGecko casi cruda | Lambda `extract_prices` |
-| `staging/decoded_events/chain=<c>/dt=<d>/` | eventos decodificados y normalizados | Lambda `decode` |
-| `silver/` | `nft_sales`, `mana_prices_daily`, eventos limpios | dbt |
+| `bronze/onchain_logs/chain=<c>/dt=<d>/` | raw hex logs, parquet | `extract_onchain` Lambda |
+| `bronze/mana_prices/dt=<d>/` | near-raw CoinGecko response | `extract_prices` Lambda |
+| `staging/decoded_events/chain=<c>/dt=<d>/` | decoded, normalized events | `decode` Lambda |
+| `silver/` | `nft_sales`, `mana_prices_daily`, clean events | dbt |
 | `gold/` | `daily_marketplace_kpis`, `asset_category_stats`, `mana_price_vs_activity` | dbt |
-| `platinum/` | extractos ultra-agregados (KB), público-legibles | Lambda `export_platinum` |
+| `platinum/` | ultra-aggregated extracts (KBs), publicly readable | `export_platinum` Lambda |
 
-Un solo bucket con prefijos (más simple para IAM y lifecycle). Glue Data Catalog
-como metastore; todo consultable desde Athena.
+A single bucket with prefixes (simpler for IAM and lifecycle). Glue Data
+Catalog as metastore; everything queryable from Athena.
 
-**Platinum** es la capa de servicio: el dashboard lee estos parquets por HTTPS
-sin credenciales AWS y sin generar queries de Athena por visita. Argumento:
-"gold es para analistas con SQL; platinum es el contrato de datos con aplicaciones".
+**Platinum** is the serving layer: the dashboard reads these parquet files over
+HTTPS with no AWS credentials and no per-visit Athena queries. Rationale:
+"gold is for analysts with SQL; platinum is the data contract with applications".
 
-## 4. Frontera Python / SQL
+## 4. Python / SQL boundary
 
-Decisión clave del diseño (dbt-athena no soporta Python models):
+Key design decision (dbt-athena does not support Python models):
 
-- **Python — Lambda `decode` (bronze → staging)**, trabajo a nivel de registro:
-  identificar evento por `topics[0]`, decodificar topics/data con `eth_abi`
-  (tipos declarados por evento), normalizar unidades (wei→MANA, direcciones,
-  timestamps UTC).
-- **SQL/dbt (staging → silver → gold)**, trabajo a nivel de conjunto:
-  deduplicación por `(tx_hash, log_index)`, armado de la entidad "venta"
-  joineando eventos de la misma transacción (`OrderSuccessful` + `Transfer`),
-  unificación de los caminos de venta (Marketplace, Bids, tienda Polygon) con
-  UNION, clasificación por categoría vía seeds, enriquecimiento con precio USD,
-  filtrado de no-ventas (mints, cancelaciones), tests de calidad.
+- **Python — `decode` Lambda (bronze → staging)**, record-level work:
+  identify each event by `topics[0]`, decode topics/data with `eth_abi`
+  (types declared per event), normalize units (wei→MANA, addresses,
+  UTC timestamps).
+- **SQL/dbt (staging → silver → gold)**, set-based work:
+  deduplication by `(tx_hash, log_index)`, assembling the "sale" entity by
+  joining events within the same transaction (`OrderSuccessful` + `Transfer`),
+  unifying the sale paths (Marketplace, Bids, Polygon store) with UNION,
+  category classification via seeds, USD price enrichment, filtering
+  non-sales (mints, cancellations), data quality tests.
 
-La experiencia del usuario decodificando manualmente (substrings de hex) se
-luce en `tests/test_decode.py`: decodificación manual como oráculo contra
-`eth_abi`, más validación de N ventas contra Etherscan/Polygonscan.
+The user's hands-on experience decoding manually (hex substrings) shines in
+`tests/test_decode.py`: manual decoding as an oracle against `eth_abi`, plus
+validation of N sales against Etherscan/Polygonscan.
 
-## 5. Datos de referencia
+## 5. Reference data
 
-dbt seeds (CSVs versionados en `dbt/seeds/`): direcciones de contratos,
-categorías de assets, firmas de eventos. Se descartó DynamoDB: los joins pasan
-en Athena, el versionado por git es superior para referencia chica, y no hay
-estado operacional que guardar (la idempotencia por partición de día hace de
-watermark).
+dbt seeds (versioned CSVs in `dbt/seeds/`): contract addresses, asset
+categories, event signatures. DynamoDB was ruled out: joins happen in Athena,
+git versioning is superior for small reference data, and there is no
+operational state to store (day-partition idempotency acts as the watermark).
 
-## 6. Orquestación y operación
+## 6. Orchestration and operations
 
-Step Functions (Standard, free tier), disparado por EventBridge cron 06:00 UTC:
+Step Functions (Standard, free tier), triggered by an EventBridge cron at
+06:00 UTC:
 
 ```
 [extract_onchain ∥ extract_prices] → decode → dbt build (silver→gold + tests) → export_platinum
 ```
 
-- Retries declarativos (2 intentos, backoff exponencial) por paso.
-- Rama Catch → SNS → email en fallos.
-- dbt tests fallando frenan el pipeline antes de publicar platinum.
-- Idempotencia: reescribir la partición del día es seguro.
-- Backfill: mismo state machine con input `{"start_date": ..., "end_date": ...}`;
-  default "ayer".
-- dbt-core + dbt-athena como Lambda container image (no entra en zip de 250 MB);
-  build estimado 1-3 min, muy por debajo del límite de 15 min. Camino de escalado
-  documentado: mover esa tarea a ECS Fargate si el build creciera 10x.
-- IAM de mínimo privilegio por Lambda (extract escribe solo bronze; decode lee
-  bronze y escribe staging; dbt lee staging y escribe silver/gold; export escribe
-  platinum). Service account de GCP en SSM Parameter Store.
-- CloudWatch logs con retención 7 días.
+- Declarative retries (2 attempts, exponential backoff) per step.
+- Catch branch → SNS → email on failure.
+- Failing dbt tests stop the pipeline before publishing platinum.
+- Idempotency: rewriting the day's partition is safe.
+- Backfill: same state machine with input `{"start_date": ..., "end_date": ...}`;
+  defaults to "yesterday".
+- dbt-core + dbt-athena as a Lambda container image (doesn't fit the 250 MB
+  zip limit); estimated build 1-3 min, far below the 15-min Lambda limit.
+  Documented scaling path: move that task to ECS Fargate if the build grows 10x.
+- Least-privilege IAM per Lambda (extract writes only bronze; decode reads
+  bronze and writes staging; dbt reads staging and writes silver/gold; export
+  writes platinum). GCP service account key in SSM Parameter Store.
+- CloudWatch logs with 7-day retention.
 
-## 7. Consumo
+## 7. Consumption
 
-Dashboard Streamlit en Streamlit Community Cloud (gratis), leyendo `platinum/`
-por HTTPS. Vistas: KPIs del marketplace, precio MANA vs actividad, análisis por
-categoría de asset, y página "About" con el diagrama de arquitectura.
+Streamlit dashboard on Streamlit Community Cloud (free), reading `platinum/`
+over HTTPS. Views: marketplace KPIs, MANA price vs activity, asset category
+analysis, and an "About" page with the architecture diagram.
 
-## 8. Infraestructura y CI/CD
+## 8. Infrastructure and CI/CD
 
-- **Terraform** para todo (elegido sobre SAM por valor de CV y cobertura de
-  recursos de datos); región us-east-1; nunca crear recursos por consola.
-- **GitHub Actions**: en PRs `pytest` + `ruff` + `terraform validate/plan` +
-  `dbt parse`; en main, build de imágenes + `terraform apply` con OIDC
-  (sin access keys guardadas).
+- **Terraform** for everything (chosen over SAM for CV value and data-resource
+  coverage); region us-east-1; never create resources through the console.
+- **GitHub Actions**: on PRs `pytest` + `ruff` + `terraform validate/plan` +
+  `dbt parse`; on main, image builds + `terraform apply` with OIDC
+  (no stored access keys).
 
 ## 9. Testing
 
-- **pytest**: chunking/particionado de extracción, lógica de decode (manual vs
-  eth_abi con fixtures de logs reales).
-- **dbt tests**: unicidad, not_null, freshness, rangos de precio en silver y gold.
-- **Validación cruzada**: ventas decodificadas comparadas contra exploradores
-  de bloques.
+- **pytest**: extraction chunking/partitioning, decode logic (manual vs
+  eth_abi with real log fixtures).
+- **dbt tests**: uniqueness, not_null, freshness, price ranges in silver and gold.
+- **Cross-validation**: decoded sales compared against block explorers.
 
-## 10. Orden de construcción
+## 10. Build order
 
-1. Terraform base (bucket, catalog, IAM) + Lambda de precios → primer dato en bronze.
-2. Lambda BigQuery → bronze on-chain.
-3. Lambda decode → staging.
+1. Base Terraform (bucket, catalog, IAM) + prices Lambda → first data in bronze.
+2. BigQuery Lambda → on-chain bronze.
+3. Decode Lambda → staging.
 4. dbt: silver + tests.
-5. dbt: gold + export platinum.
+5. dbt: gold + platinum export.
 6. Step Functions + EventBridge.
-7. Dashboard + README con diagrama.
+7. Dashboard + README with diagram.
 
-## Fuera de alcance (YAGNI)
+## Out of scope (YAGNI)
 
-Streaming/tiempo real, DynamoDB, Redshift, Airflow/MWAA, QuickSight, más chains
-que Ethereum y Polygon, API de servicio propia.
+Streaming/real-time, DynamoDB, Redshift, Airflow/MWAA, QuickSight, chains
+beyond Ethereum and Polygon, a dedicated serving API.
