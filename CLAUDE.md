@@ -7,7 +7,7 @@ public dashboard. Target budget: ~$0/month (free tiers).
 
 ## Architecture in 5 lines
 
-- **Sources**: BigQuery public datasets (`crypto_ethereum`, `crypto_polygon`) for raw logs; CoinGecko for MANA prices.
+- **Sources**: BigQuery public datasets (`crypto_ethereum`, `crypto_polygon`) for raw logs; `contracts.decentraland.org/addresses.json` for the contract registry (mainnet+matic only, daily full snapshot); CoinGecko for MANA prices.
 - **Medallion lake in a single S3 bucket**: `bronze/` (raw) → `staging/` (decoded) → `silver/` (clean entities) → `gold/` (KPIs) → `platinum/` (public extracts for the dashboard).
 - **Python/SQL boundary**: Python (`decode` Lambda with eth_abi) for record-level transformation; dbt-athena for everything set-based (dedup, joins, aggregations). dbt-athena does NOT support Python models.
 - **Orchestration**: Step Functions — parallel extractions → decode → dbt build → platinum export. EventBridge daily cron 06:00 UTC. SNS for alerts.
@@ -18,9 +18,10 @@ public dashboard. Target budget: ~$0/month (free tiers).
 | Folder | Role |
 |---|---|
 | `terraform/` | All infrastructure (S3, Lambdas, Step Functions, Glue/Athena, IAM, SNS) |
-| `ingestion/onchain/`, `ingestion/prices/` | Extraction Lambdas → bronze |
+| `ingestion/onchain/` (common/ + one folder per chain), `ingestion/dcl_contracts/`, `ingestion/prices/` | Extraction Lambdas → bronze |
 | `decode/` | Python Lambda bronze → staging (ABI decoding with eth_abi) |
-| `dbt/` | dbt-athena project: staging → silver → gold. Reference data in `seeds/` |
+| `reference/` | Hand-curated reference CSVs (chains, general marketplaces, categories) — consumed by dbt via seed-paths and copied into Lambda images |
+| `dbt/` | dbt-athena project: staging → silver → gold (no local seeds/ — uses ../reference) |
 | `platinum_export/` | Lambda gold → platinum |
 | `dashboard/` | Streamlit app |
 | `tests/` | pytest; `test_decode.py` validates eth_abi against manual decoding |
@@ -35,8 +36,12 @@ public dashboard. Target budget: ~$0/month (free tiers).
 - Never commit: tfstate, GCP keys, .tfvars with secrets (see .gitignore).
 - Secrets (GCP service account) in SSM Parameter Store.
 - Lambdas with heavy deps (BigQuery, eth_abi, dbt) ship as container images; light ones as zip.
-- Incremental, idempotent extraction by `chain=/dt=` partition; backfill = same code with `{start_date, end_date}`.
-- Reference data (contracts, categories) as dbt seeds — DynamoDB deliberately ruled out.
+- Partitions: `dt=YYYY-MM-DD` (daily), `month=YYYY-MM` (monthly). Never name a partition `date` (Athena reserved word).
+- Chains by numeric EIP-155 `chain_id` (1=ethereum, 137=polygon) in columns AND S3 paths (`chain_id=1/dt=...`). Contract key is always `(chain_id, address)`; addresses lowercase at write time.
+- Bucket: `decentraland-data-platform-${account_id}` (interpolated in Terraform, never hardcoded).
+- Incremental, idempotent extraction by partition; backfill = same code with `{start_date, end_date}`. Small sources (dcl_contracts) use daily full snapshots instead.
+- Reference data (hand-curated only) lives in `reference/` — DynamoDB deliberately ruled out. Data with a live official source enters as a pipeline source, not reference.
+- Cost tags on everything: provider `default_tags` (project, managed_by) + per-resource `component` and `layer`; Athena spend via dedicated tagged workgroup. Tags must be activated in Billing console.
 - Failing dbt tests stop the pipeline before publishing platinum.
 - CI on GitHub Actions: pytest + ruff + terraform validate/plan + dbt parse on PRs; deploy with OIDC on main.
 
@@ -60,6 +65,8 @@ Conversation language: Spanish.
 
 New designs are validated section by section and stored in
 `docs/superpowers/specs/`; each spec yields a plan in `docs/superpowers/plans/`
-executed with checkpoints. Agreed build order: 1) base Terraform + prices
-Lambda, 2) BigQuery Lambda → bronze, 3) decode, 4) dbt silver,
-5) gold+platinum, 6) Step Functions, 7) dashboard+README.
+executed with checkpoints. Agreed build order: 1) base Terraform +
+`extract_dcl_contracts` Lambda (addresses.json → bronze snapshot), 2) on-chain
+Lambdas (read contract list from the S3 snapshot), 3) prices Lambda,
+4) decode, 5) dbt silver, 6) gold+platinum, 7) Step Functions,
+8) dashboard+README.
