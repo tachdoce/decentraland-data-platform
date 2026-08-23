@@ -1,0 +1,2 @@
+dbt-core==1.12.3
+dbt-athena==1.11.0

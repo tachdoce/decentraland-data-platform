@@ -5,6 +5,7 @@ locals {
     aws_lambda_function.dcl_contracts.function_name,
     aws_lambda_function.dcl_contracts_diff.function_name,
     aws_lambda_function.contracts.function_name,
+    aws_lambda_function.run_dbt.function_name,
   ]
 }
 

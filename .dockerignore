@@ -1,0 +1,5 @@
+dbt/target
+dbt/logs
+**/__pycache__
+.venv
+terraform

@@ -39,6 +39,10 @@ def run_dbt(select: str) -> None:
         raise RuntimeError(
             f"dbt build failed: {result.exception or 'model or test failures'}"
         )
+    # dbt reports success with zero nodes for a selector that matches
+    # nothing (e.g. a typo): surface it instead of silently doing nothing.
+    if not getattr(result.result, "results", None):
+        raise RuntimeError(f"dbt selection {select!r} matched no nodes")
 
 
 def fetch_change_counts(athena) -> dict[str, int]:

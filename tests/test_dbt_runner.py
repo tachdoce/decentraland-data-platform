@@ -13,9 +13,16 @@ class FakeDbtRunner:
     calls: ClassVar[list[list[str]]] = []
     success = True
 
+    nodes = 1
+
     def invoke(self, args):
         FakeDbtRunner.calls.append(list(args))
-        return SimpleNamespace(success=FakeDbtRunner.success, exception=None)
+        results = [object()] * FakeDbtRunner.nodes
+        return SimpleNamespace(
+            success=FakeDbtRunner.success,
+            exception=None,
+            result=SimpleNamespace(results=results),
+        )
 
 
 class FakeAthena:
@@ -55,6 +62,7 @@ def env(monkeypatch):
 
 def _wire(monkeypatch, athena, sns):
     FakeDbtRunner.calls = []
+    FakeDbtRunner.nodes = 1
     monkeypatch.setattr(h, "dbtRunner", FakeDbtRunner)
     monkeypatch.setattr(
         h.boto3, "client", lambda svc: {"athena": athena, "sns": sns}[svc]
@@ -113,6 +121,17 @@ def test_changes_publish_info(env, monkeypatch):
     assert msg["component"] == "dbt build"
     assert msg["status"] == "INFO"
     assert "added=2" in msg["detail"] and "renamed=1" in msg["detail"]
+
+
+def test_empty_selection_raises(env, monkeypatch):
+    # dbt returns success with zero nodes for a typo'd selector; the handler
+    # must treat that as a failure instead of silently doing nothing.
+    _wire(monkeypatch, FakeAthena([]), FakeSNS())
+    FakeDbtRunner.success = True
+    FakeDbtRunner.nodes = 0
+
+    with pytest.raises(RuntimeError, match="matched no nodes"):
+        h.handler({"select": "nonexistent_model"}, None)
 
 
 def test_changes_query_failure_raises(env, monkeypatch):
