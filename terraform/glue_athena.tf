@@ -3,6 +3,11 @@ resource "aws_glue_catalog_database" "bronze" {
   tags = local.base_tags
 }
 
+resource "aws_glue_catalog_database" "silver" {
+  name = "silver"
+  tags = local.base_tags
+}
+
 resource "aws_athena_workgroup" "main" {
   name = "decentraland-data-platform"
   tags = local.base_tags
