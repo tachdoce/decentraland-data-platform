@@ -135,25 +135,10 @@ resource "aws_lambda_function" "contracts" {
   depends_on = [aws_cloudwatch_log_group.contracts]
 }
 
-resource "aws_lambda_permission" "contracts_s3" {
-  statement_id  = "AllowS3Invoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.contracts.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.lake.arn
-}
-
-# NOTE: a bucket supports ONE aws_s3_bucket_notification resource. Future
-# landing/ triggers are added as additional lambda_function blocks HERE.
+# S3 events now flow through EventBridge: the contracts-on-push state
+# machine (step_functions_contracts.tf) starts on landing/contracts/*.csv.
+# Future landing/ triggers add EventBridge rules, not lambda_function blocks.
 resource "aws_s3_bucket_notification" "lake" {
-  bucket = aws_s3_bucket.lake.id
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.contracts.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "landing/contracts/"
-    filter_suffix       = ".csv"
-  }
-
-  depends_on = [aws_lambda_permission.contracts_s3]
+  bucket      = aws_s3_bucket.lake.id
+  eventbridge = true
 }
