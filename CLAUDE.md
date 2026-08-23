@@ -69,7 +69,10 @@ executed with checkpoints. Build order: 1) base Terraform +
 `extract_dcl_contracts` (DONE — deployed; scheduled daily 06:00 UTC via the
 `dcl-contracts-daily` state machine, which also runs `diff_dcl_contracts`
 to alert day-over-day registry changes to Slack), 2) event-driven
-`contracts` ingestion (landing→Lambda→bronze; curated CSV with `dcl_contract` + `erc_type`), 3) on-chain Lambdas
+`contracts` ingestion (DONE — CSV push to landing/contracts/ starts the
+`contracts-on-push` state machine: `load-contracts` → `run-dbt`, a
+container-image Lambda that builds `silver.dim_contracts` and its tests;
+curated CSV carries `dcl_contract` + `erc_type`), 3) on-chain Lambdas
 (contract lists + per-contract `extract_from_dt` backfill from S3
 snapshots), 4) prices, 5) decode, 6) dbt silver (incl. unified
 `silver.contracts` view), 7) gold+platinum, 8) Step Functions,
