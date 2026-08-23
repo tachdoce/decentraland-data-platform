@@ -113,11 +113,6 @@ resource "aws_iam_role_policy" "run_dbt" {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject"]
         Resource = "${aws_s3_bucket.lake.arn}/athena-results/*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = "sns:Publish"
-        Resource = aws_sns_topic.alerts.arn
       }
     ]
   })
@@ -150,8 +145,6 @@ resource "aws_lambda_function" "run_dbt" {
   environment {
     variables = {
       DBT_PROJECT_DIR                = "/var/task/dbt"
-      ATHENA_WORKGROUP               = aws_athena_workgroup.main.name
-      ALERTS_TOPIC_ARN               = aws_sns_topic.alerts.arn
       DBT_SEND_ANONYMOUS_USAGE_STATS = "False" # avoids ~/.dbt writes on a read-only FS
       HOME                           = "/tmp"
     }
