@@ -9,8 +9,8 @@ sources:
       - name: dcl_contracts
         description: >
           Daily full snapshot of the official Decentraland contract registry
-          (contracts.decentraland.org/addresses.json). Partitioned by dt
-          (partition projection).
+          (contracts.decentraland.org/addresses.json). Partitioned by dt;
+          partitions registered explicitly by the Lambda.
         columns:
           - name: chain_id
             description: EIP-155 numeric chain id (1=ethereum, 137=polygon).
