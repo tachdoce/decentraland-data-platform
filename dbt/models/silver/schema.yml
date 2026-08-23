@@ -3,9 +3,10 @@ version: 2
 models:
   - name: dim_contracts
     description: >
-      Unified contract dimension merging the official Decentraland registry
-      (dcl_contracts) with the hand-curated contract list (contracts).
-      One row per (chain_id, contract_address).
+      Curated contract dimension from the latest bronze.contracts snapshot
+      (the hand-curated CSV, single source of truth). erc_type = -1 rows
+      are excluded here; consumers never see them. One row per
+      (chain_id, contract_address).
     columns:
       - name: chain_id
         data_tests:
@@ -17,6 +18,16 @@ models:
       - name: contract_address
         data_tests:
           - not_null
+      - name: dcl_contract
+        data_tests:
+          - not_null
+      - name: erc_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 20, 721, 1155]
+                quote: false
 
   - name: dim_contracts_changes
     description: >

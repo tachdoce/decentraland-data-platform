@@ -1,6 +1,4 @@
--- Composite uniqueness on (chain_id, contract_address) without dbt_utils.
--- Fails if any key appears more than once.
-
+-- Fails when (chain_id, contract_address) is not unique in the dimension.
 select
     chain_id,
     contract_address,
