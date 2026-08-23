@@ -8,10 +8,10 @@ with dcl_contracts as (
 
 ),
 
-nft_contracts as (
+contracts as (
 
     select *
-    from {{ source('bronze', 'nft_contracts') }}
+    from {{ source('bronze', 'contracts') }}
 
 )
 

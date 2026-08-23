@@ -1,6 +1,6 @@
-"""load-nft-contracts Lambda: landing/ CSV upload -> bronze/nft_contracts snapshot.
+"""load-contracts Lambda: landing/ CSV upload -> bronze/contracts snapshot.
 
-Triggered by S3 ObjectCreated events (prefix landing/nft_contracts/, suffix .csv).
+Triggered by S3 ObjectCreated events (prefix landing/contracts/, suffix .csv).
 """
 
 import datetime
@@ -12,7 +12,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ingestion.common.partitions import register_partition
-from ingestion.nft_contracts.validate import parse_and_validate, partition_key
+from ingestion.contracts.validate import parse_and_validate, partition_key
 
 SCHEMA = pa.schema(
     [
@@ -21,6 +21,8 @@ SCHEMA = pa.schema(
         ("contract_name", pa.string()),
         ("first_mint_dt", pa.date32()),
         ("extract_from_dt", pa.date32()),
+        ("dcl_contract", pa.bool_()),
+        ("erc_type", pa.int32()),
     ]
 )
 
@@ -48,7 +50,7 @@ def handler(event, context):
         run_date = datetime.datetime.now(datetime.timezone.utc).date()
         out_key = partition_key(run_date)
         s3.put_object(Bucket=bucket, Key=out_key, Body=rows_to_parquet(rows))
-        register_partition("nft_contracts", run_date, bucket)
+        register_partition("contracts", run_date, bucket)
 
         print(
             f"validated {len(rows)} rows from s3://{bucket}/{source_key}; "

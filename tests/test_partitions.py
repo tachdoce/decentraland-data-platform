@@ -46,4 +46,4 @@ def test_register_partition_raises_on_failed_ddl(monkeypatch):
         p.boto3, "client", lambda service: FakeAthena([], state="FAILED")
     )
     with pytest.raises(RuntimeError, match="FAILED.*fake reason"):
-        register_partition("nft_contracts", datetime.date(2026, 8, 21), "test-bucket")
+        register_partition("contracts", datetime.date(2026, 8, 21), "test-bucket")

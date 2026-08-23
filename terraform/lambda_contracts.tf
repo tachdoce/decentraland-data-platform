@@ -1,18 +1,18 @@
 locals {
-  nft_contracts_tags = { component = "ingestion-nft-contracts", layer = "bronze" }
+  contracts_tags = { component = "ingestion-contracts", layer = "bronze" }
 }
 
-data "archive_file" "nft_contracts_zip" {
+data "archive_file" "contracts_zip" {
   type        = "zip"
-  output_path = "${path.module}/build/nft_contracts.zip"
+  output_path = "${path.module}/build/contracts.zip"
 
   source {
-    content  = file("${path.module}/../ingestion/nft_contracts/handler.py")
-    filename = "ingestion/nft_contracts/handler.py"
+    content  = file("${path.module}/../ingestion/contracts/handler.py")
+    filename = "ingestion/contracts/handler.py"
   }
   source {
-    content  = file("${path.module}/../ingestion/nft_contracts/validate.py")
-    filename = "ingestion/nft_contracts/validate.py"
+    content  = file("${path.module}/../ingestion/contracts/validate.py")
+    filename = "ingestion/contracts/validate.py"
   }
   source {
     content  = ""
@@ -20,7 +20,7 @@ data "archive_file" "nft_contracts_zip" {
   }
   source {
     content  = ""
-    filename = "ingestion/nft_contracts/__init__.py"
+    filename = "ingestion/contracts/__init__.py"
   }
   source {
     content  = file("${path.module}/../ingestion/common/partitions.py")
@@ -32,9 +32,9 @@ data "archive_file" "nft_contracts_zip" {
   }
 }
 
-resource "aws_iam_role" "nft_contracts" {
-  name = "load-nft-contracts-role"
-  tags = local.nft_contracts_tags
+resource "aws_iam_role" "contracts" {
+  name = "load-contracts-role"
+  tags = local.contracts_tags
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -46,9 +46,9 @@ resource "aws_iam_role" "nft_contracts" {
   })
 }
 
-resource "aws_iam_role_policy" "nft_contracts_s3" {
+resource "aws_iam_role_policy" "contracts_s3" {
   name = "landing-read-bronze-write"
-  role = aws_iam_role.nft_contracts.id
+  role = aws_iam_role.contracts.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -56,12 +56,12 @@ resource "aws_iam_role_policy" "nft_contracts_s3" {
       {
         Effect   = "Allow"
         Action   = "s3:GetObject"
-        Resource = "${aws_s3_bucket.lake.arn}/landing/nft_contracts/*"
+        Resource = "${aws_s3_bucket.lake.arn}/landing/contracts/*"
       },
       {
         Effect   = "Allow"
         Action   = "s3:PutObject"
-        Resource = "${aws_s3_bucket.lake.arn}/bronze/nft_contracts/*"
+        Resource = "${aws_s3_bucket.lake.arn}/bronze/contracts/*"
       },
       # Athena writes DDL query results with the caller's credentials
       {
@@ -94,33 +94,33 @@ resource "aws_iam_role_policy" "nft_contracts_s3" {
         Resource = [
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:catalog",
           aws_glue_catalog_database.bronze.arn,
-          aws_glue_catalog_table.nft_contracts.arn,
+          aws_glue_catalog_table.contracts.arn,
         ]
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "nft_contracts_logs" {
-  role       = aws_iam_role.nft_contracts.name
+resource "aws_iam_role_policy_attachment" "contracts_logs" {
+  role       = aws_iam_role.contracts.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_cloudwatch_log_group" "nft_contracts" {
-  name              = "/aws/lambda/load-nft-contracts"
+resource "aws_cloudwatch_log_group" "contracts" {
+  name              = "/aws/lambda/load-contracts"
   retention_in_days = 7
-  tags              = local.nft_contracts_tags
+  tags              = local.contracts_tags
 }
 
-resource "aws_lambda_function" "nft_contracts" {
-  function_name = "load-nft-contracts"
-  role          = aws_iam_role.nft_contracts.arn
-  tags          = local.nft_contracts_tags
+resource "aws_lambda_function" "contracts" {
+  function_name = "load-contracts"
+  role          = aws_iam_role.contracts.arn
+  tags          = local.contracts_tags
 
-  filename         = data.archive_file.nft_contracts_zip.output_path
-  source_code_hash = data.archive_file.nft_contracts_zip.output_base64sha256
+  filename         = data.archive_file.contracts_zip.output_path
+  source_code_hash = data.archive_file.contracts_zip.output_base64sha256
 
-  handler     = "ingestion.nft_contracts.handler.handler"
+  handler     = "ingestion.contracts.handler.handler"
   runtime     = "python3.13"
   timeout     = 60
   memory_size = 512
@@ -132,13 +132,13 @@ resource "aws_lambda_function" "nft_contracts" {
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.nft_contracts]
+  depends_on = [aws_cloudwatch_log_group.contracts]
 }
 
-resource "aws_lambda_permission" "nft_contracts_s3" {
+resource "aws_lambda_permission" "contracts_s3" {
   statement_id  = "AllowS3Invoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.nft_contracts.function_name
+  function_name = aws_lambda_function.contracts.function_name
   principal     = "s3.amazonaws.com"
   source_arn    = aws_s3_bucket.lake.arn
 }
@@ -149,11 +149,11 @@ resource "aws_s3_bucket_notification" "lake" {
   bucket = aws_s3_bucket.lake.id
 
   lambda_function {
-    lambda_function_arn = aws_lambda_function.nft_contracts.arn
+    lambda_function_arn = aws_lambda_function.contracts.arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "landing/nft_contracts/"
+    filter_prefix       = "landing/contracts/"
     filter_suffix       = ".csv"
   }
 
-  depends_on = [aws_lambda_permission.nft_contracts_s3]
+  depends_on = [aws_lambda_permission.contracts_s3]
 }

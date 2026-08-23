@@ -5,7 +5,7 @@ resource "aws_glue_catalog_table" "dcl_contracts" {
 
   # No partition projection here: the Lambda registers each partition
   # explicitly (ALTER TABLE ADD PARTITION) and the catalog lists exactly
-  # the partitions that really exist — same pattern as nft_contracts.
+  # the partitions that really exist — same pattern as contracts.
   parameters = {
     "classification" = "parquet"
   }

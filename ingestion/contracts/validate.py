@@ -1,4 +1,4 @@
-"""Pure validation/parsing for the curated nft_contracts CSV.
+"""Pure validation/parsing for the curated contracts CSV.
 
 Whole-file semantics: any defect raises ValueError and nothing is written.
 No AWS or network calls here.
@@ -15,9 +15,14 @@ EXPECTED_HEADER = [
     "contract_name",
     "first_mint_dt",
     "extract_from_dt",
+    "dcl_contract",
+    "erc_type",
 ]
 
 KNOWN_CHAIN_IDS = {1, 137}
+# -1 = ignore, 0 = type not yet classified (likely marketplace or similar),
+# 20/721/1155 = ERC token standards.
+KNOWN_ERC_TYPES = {-1, 0, 20, 721, 1155}
 ADDRESS_RE = re.compile(r"^0x[0-9a-f]{40}$")
 # Strict guard: Python >= 3.11 fromisoformat() accepts compact forms like
 # 20010101, so the format must be enforced explicitly.
@@ -52,7 +57,15 @@ def parse_and_validate(csv_bytes: bytes) -> list[dict]:
             raise ValueError(
                 f"line {lineno}: expected {len(EXPECTED_HEADER)} fields, got {len(raw)}"
             )
-        chain_raw, address, name, first_mint_raw, extract_from_raw = raw
+        (
+            chain_raw,
+            address,
+            name,
+            first_mint_raw,
+            extract_from_raw,
+            dcl_raw,
+            erc_raw,
+        ) = raw
 
         try:
             chain_id = int(chain_raw)
@@ -71,6 +84,21 @@ def parse_and_validate(csv_bytes: bytes) -> list[dict]:
         first_mint = _parse_date(first_mint_raw, lineno, "first_mint_dt")
         extract_from = _parse_date(extract_from_raw, lineno, "extract_from_dt")
 
+        if dcl_raw not in ("TRUE", "FALSE"):
+            raise ValueError(
+                f"line {lineno}: dcl_contract must be TRUE or FALSE, got {dcl_raw!r}"
+            )
+        dcl_contract = dcl_raw == "TRUE"
+
+        try:
+            erc_type = int(erc_raw)
+        except ValueError:
+            raise ValueError(f"line {lineno}: erc_type is not an integer: {erc_raw!r}")
+        if erc_type not in KNOWN_ERC_TYPES:
+            raise ValueError(
+                f"line {lineno}: unknown erc_type {erc_type} (known: {sorted(KNOWN_ERC_TYPES)})"
+            )
+
         key = (chain_id, address)
         if key in seen:
             raise ValueError(
@@ -85,6 +113,8 @@ def parse_and_validate(csv_bytes: bytes) -> list[dict]:
                 "contract_name": name,
                 "first_mint_dt": first_mint,
                 "extract_from_dt": extract_from,
+                "dcl_contract": dcl_contract,
+                "erc_type": erc_type,
             }
         )
 
@@ -94,4 +124,4 @@ def parse_and_validate(csv_bytes: bytes) -> list[dict]:
 
 
 def partition_key(run_date: datetime.date) -> str:
-    return f"bronze/nft_contracts/dt={run_date.isoformat()}/contracts.parquet"
+    return f"bronze/contracts/dt={run_date.isoformat()}/contracts.parquet"

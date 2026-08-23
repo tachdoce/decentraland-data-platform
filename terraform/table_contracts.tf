@@ -1,6 +1,6 @@
-resource "aws_glue_catalog_table" "nft_contracts" {
+resource "aws_glue_catalog_table" "contracts" {
   database_name = aws_glue_catalog_database.bronze.name
-  name          = "nft_contracts"
+  name          = "contracts"
   table_type    = "EXTERNAL_TABLE"
 
   # No partition projection here: snapshots are infrequent, so the Lambda
@@ -16,7 +16,7 @@ resource "aws_glue_catalog_table" "nft_contracts" {
   }
 
   storage_descriptor {
-    location      = "s3://${local.bucket_name}/bronze/nft_contracts/"
+    location      = "s3://${local.bucket_name}/bronze/contracts/"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
 
@@ -43,6 +43,14 @@ resource "aws_glue_catalog_table" "nft_contracts" {
     columns {
       name = "extract_from_dt"
       type = "date"
+    }
+    columns {
+      name = "dcl_contract"
+      type = "boolean"
+    }
+    columns {
+      name = "erc_type"
+      type = "int"
     }
   }
 }

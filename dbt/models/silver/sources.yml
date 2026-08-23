@@ -21,9 +21,9 @@ sources:
           - name: dt
             description: Snapshot date partition (YYYY-MM-DD).
 
-      - name: nft_contracts
+      - name: contracts
         description: >
-          Hand-curated NFT contract list ingested from reference/ via
+          Hand-curated contract list ingested from reference/ via
           landing/ -> Lambda -> bronze snapshot. Partitions registered
           explicitly by the Lambda.
         columns:
@@ -37,5 +37,11 @@ sources:
             description: Date of the contract's first mint.
           - name: extract_from_dt
             description: Start date for the on-chain backfill of this contract.
+          - name: dcl_contract
+            description: True when the contract belongs to Decentraland itself.
+          - name: erc_type
+            description: >
+              ERC token standard: 20, 721 or 1155. 0 = not yet classified
+              (likely marketplace or similar); -1 = excluded from processing.
           - name: dt
             description: Snapshot date partition (YYYY-MM-DD).

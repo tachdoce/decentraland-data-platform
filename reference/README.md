@@ -4,13 +4,16 @@ Hand-curated reference files. Git is the source of truth; publishing a file
 means uploading it to the lake's `landing/` prefix, which triggers its
 ingestion Lambda (see spec `2026-08-21-nft-contracts-ingestion.md`).
 
-## nft_contracts.csv
+## contracts.csv
 
-Curated dictionary of NFT collection contracts (830 rows).
+Curated dictionary of contracts to track (971 rows): Decentraland's own
+contracts plus top NFT collections.
 
-- **Origin**: user's BigQuery exploration — yearly NFT collection ranking by
-  USD sales volume (2019-2026, Ethereum + Polygon).
-- **Cut criterion**: contracts with > $5M USD volume in at least one year.
+- **Origin**: Decentraland registry (`dcl_contract = TRUE` rows) merged with
+  the user's BigQuery exploration — yearly NFT collection ranking by USD
+  sales volume (2019-2026, Ethereum + Polygon).
+- **Cut criterion (NFT rows)**: contracts with > $5M USD volume in at least
+  one year.
 - **Cleaning applied**: deduplicated by `(chain_id, contract_address)`,
   addresses lowercased, names trimmed / quote- and comma-free / pure ASCII.
 - **Columns**:
@@ -26,10 +29,15 @@ Curated dictionary of NFT collection contracts (830 rows).
     onward. **Default `2026-01-01`** (cost-conservative start). Widening a
     contract's history = edit its row; the on-chain extraction Lambda
     backfills the missing range automatically.
+  - `dcl_contract` — `TRUE`/`FALSE`: whether the contract belongs to
+    Decentraland itself.
+  - `erc_type` — ERC token standard: `20`, `721` or `1155`. `0` = not yet
+    classified (likely marketplace or similar, still processed); `-1` =
+    excluded from processing.
 
 To publish after editing:
 
 ```bash
-aws s3 cp reference/nft_contracts.csv \
-  s3://decentraland-data-platform-<account_id>/landing/nft_contracts/
+aws s3 cp reference/contracts.csv \
+  s3://decentraland-data-platform-<account_id>/landing/contracts/
 ```

@@ -4,7 +4,7 @@ models:
   - name: dim_contracts
     description: >
       Unified contract dimension merging the official Decentraland registry
-      (dcl_contracts) with the hand-curated NFT contract list (nft_contracts).
+      (dcl_contracts) with the hand-curated contract list (contracts).
       One row per (chain_id, contract_address).
     columns:
       - name: chain_id
