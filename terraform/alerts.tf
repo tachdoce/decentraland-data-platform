@@ -3,6 +3,7 @@ locals {
   webhook_ssm_param = "/decentraland/slack_webhook_url"
   monitored_lambdas = [
     aws_lambda_function.dcl_contracts.function_name,
+    aws_lambda_function.dcl_contracts_diff.function_name,
     aws_lambda_function.nft_contracts.function_name,
   ]
 }

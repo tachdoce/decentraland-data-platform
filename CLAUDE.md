@@ -66,8 +66,9 @@ Conversation language: Spanish.
 New designs are validated section by section and stored in
 `docs/superpowers/specs/`; each spec yields a plan in `docs/superpowers/plans/`
 executed with checkpoints. Build order: 1) base Terraform +
-`extract_dcl_contracts` (DONE — deployed; manual invoke until Step
-Functions), 2) event-driven
+`extract_dcl_contracts` (DONE — deployed; scheduled daily 06:00 UTC via the
+`dcl-contracts-daily` state machine, which also runs `diff_dcl_contracts`
+to alert day-over-day registry changes to Slack), 2) event-driven
 `nft_contracts` ingestion (landing→Lambda→bronze), 3) on-chain Lambdas
 (contract lists + per-contract `extract_from_dt` backfill from S3
 snapshots), 4) prices, 5) decode, 6) dbt silver (incl. unified

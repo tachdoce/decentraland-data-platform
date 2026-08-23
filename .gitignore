@@ -35,3 +35,5 @@ dbt/logs/
 # Claude Code local settings
 .claude/settings.local.json
 dbt/.user.yml
+*.tfplan
+tfplan

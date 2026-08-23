@@ -19,8 +19,10 @@ tagging) that every later component reuses.
 
 ## Behavior
 
-`extract_dcl_contracts` Lambda, invoked manually (Step Functions will
-schedule it from phase 8):
+`extract_dcl_contracts` Lambda, scheduled daily at 06:00 UTC by the
+`dcl-contracts-daily` Step Functions state machine (which then runs
+`diff_dcl_contracts` to alert day-over-day changes; phase 8 grows this
+state machine into the full-pipeline orchestration):
 
 1. **Extract**: GET `addresses.json`. The response contains 7 networks; only
    `mainnet` and `matic` are kept.
@@ -81,8 +83,9 @@ Component:
   memory 512 MB. Tags: `component=ingestion-dcl-contracts`, `layer=bronze`.
 - IAM role: `s3:PutObject` on `bronze/dcl_contracts/*`, the Athena/Glue
   permissions for partition DDL, plus basic logging.
-- No EventBridge trigger: orchestration arrives with Step Functions
-  (phase 8); until then, manual invokes.
+- EventBridge cron 06:00 UTC targets the `dcl-contracts-daily` state
+  machine (not the Lambda directly); phase 8 extends that state machine
+  with the remaining pipeline branches.
 - CloudWatch log group, 7-day retention.
 
 ## Repo layout
