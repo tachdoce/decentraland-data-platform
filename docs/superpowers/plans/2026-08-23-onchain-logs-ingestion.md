@@ -849,7 +849,9 @@ Read the plan before applying (targeted, because `data.aws_ecr_image` needs an i
 
 ```bash
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 683569194224.dkr.ecr.us-east-1.amazonaws.com
-docker build -f ingestion/onchain/Dockerfile -t 683569194224.dkr.ecr.us-east-1.amazonaws.com/decentraland-extract-onchain-logs:latest .
+# --provenance=false: Docker otherwise pushes an OCI index with an
+# attestation manifest, which Lambda rejects (needs single-platform).
+docker build --provenance=false -f ingestion/onchain/Dockerfile -t 683569194224.dkr.ecr.us-east-1.amazonaws.com/decentraland-extract-onchain-logs:latest .
 docker push 683569194224.dkr.ecr.us-east-1.amazonaws.com/decentraland-extract-onchain-logs:latest
 ```
 
