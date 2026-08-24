@@ -110,8 +110,10 @@ resource "aws_iam_role_policy" "run_dbt" {
         Resource = "${aws_s3_bucket.lake.arn}/bronze/contracts/*"
       },
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject"]
+        Effect = "Allow"
+        # DeleteObject: the table materialization drops the previous
+        # build's data files under athena-results/ before recreating.
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
         Resource = "${aws_s3_bucket.lake.arn}/athena-results/*"
       }
     ]
