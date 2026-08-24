@@ -16,7 +16,7 @@ FIXTURE_BYTES = (
 
 def test_real_reference_file_parses():
     rows = parse_and_validate(FIXTURE_BYTES)
-    assert len(rows) == 971
+    assert len(rows) == 967
     assert {r["chain_id"] for r in rows} == {1, 137}
     first = rows[0]
     assert isinstance(first["chain_id"], int)
@@ -33,8 +33,10 @@ def test_default_sentinels_present():
 
 
 def test_empty_contract_name_is_allowed():
-    rows = parse_and_validate(FIXTURE_BYTES)
-    assert any(r["contract_name"] == "" for r in rows)  # 12 pending-curation rows
+    # The reference file is fully curated today; empty names remain legal
+    # for future pending-curation rows.
+    rows = parse_and_validate(_csv(HEADER, _line(contract_name="")))
+    assert rows[0]["contract_name"] == ""
 
 
 def test_reference_file_erc_type_distribution():
@@ -153,7 +155,7 @@ def test_rows_to_parquet_roundtrip(tmp_path):
         "dcl_contract",
         "erc_type",
     ]
-    assert table.num_rows == 971
+    assert table.num_rows == 967
     assert str(table.schema.field("chain_id").type) == "int32"
     assert str(table.schema.field("first_mint_dt").type) == "date32[day]"
     assert str(table.schema.field("extract_from_dt").type) == "date32[day]"
@@ -213,7 +215,7 @@ def test_handler_reads_event_and_writes_partition(monkeypatch, tmp_path):
         ]
     }
     result = h.handler(event, None)
-    assert result["rows"] == 971
+    assert result["rows"] == 967
     assert written["bucket"] == "test-bucket"
     assert written["key"].startswith("bronze/contracts/dt=")
     assert written["key"].endswith("/contracts.parquet")
