@@ -7,7 +7,7 @@ public dashboard. Target budget: ~$0/month (free tiers).
 
 ## Architecture in 5 lines
 
-- **Sources**: BigQuery public datasets (`crypto_ethereum`, `crypto_polygon`) for raw logs; `contracts.decentraland.org/addresses.json` for the contract registry (mainnet+matic only, daily full snapshot); CoinGecko for MANA prices.
+- **Sources**: BigQuery public datasets (`goog_blockchain_ethereum_mainnet_us`, `goog_blockchain_polygon_mainnet_us`) for raw logs; `contracts.decentraland.org/addresses.json` for the contract registry (mainnet+matic only, daily full snapshot); CoinGecko for MANA prices.
 - **Medallion lake in a single S3 bucket**: `bronze/` (raw) → `staging/` (decoded) → `silver/` (clean entities) → `gold/` (KPIs) → `platinum/` (public extracts for the dashboard).
 - **Python/SQL boundary**: Python (`decode` Lambda with eth_abi) for record-level transformation; dbt-athena for everything set-based (dedup, joins, aggregations). dbt-athena does NOT support Python models.
 - **Orchestration**: Step Functions — parallel extractions → decode → dbt build → platinum export. EventBridge daily cron 06:00 UTC. SNS for alerts.

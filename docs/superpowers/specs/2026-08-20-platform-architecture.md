@@ -18,9 +18,11 @@ reproducible from the repo (Terraform), and maximum interview value
 
 ## 2. Data sources
 
-- **On-chain logs**: BigQuery public datasets `crypto_ethereum` and
-  `crypto_polygon`, filtered by Decentraland contract addresses and date
-  partition. Logs arrive raw (hex topics/data) — decoding is ours. BigQuery
+- **On-chain logs**: BigQuery public datasets
+  `goog_blockchain_ethereum_mainnet_us` and
+  `goog_blockchain_polygon_mainnet_us` (chosen 2026-08-23 over the older
+  `crypto_*` datasets), filtered by Decentraland contract addresses and
+  date partition. Logs arrive raw (hex topics/data) — decoding is ours. BigQuery
   permanent free tier (1 TB queries/month) covers daily extraction.
 - **Decentraland contract registry**: the official
   `https://contracts.decentraland.org/addresses.json` endpoint, treated as a
