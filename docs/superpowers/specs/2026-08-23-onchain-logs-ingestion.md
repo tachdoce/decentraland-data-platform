@@ -96,7 +96,10 @@ ORDER BY block_timestamp, log_index
    keys break URL handling and Windows downloads). Zero query results is
    a valid outcome (quiet day): write the empty parquet with the full
    schema so the partition exists and downstream never special-cases.
-7. Log `total_bytes_processed` and the row count; return them in the
+7. Register the `dt` partition in the Glue catalog via the shared
+   `register_partition` helper (fails loudly if the DDL does not
+   succeed).
+8. Log `total_bytes_processed` and the row count; return them in the
    response for orchestration visibility.
 
 ## 4. Bronze schema (both tables)
@@ -111,9 +114,14 @@ ORDER BY block_timestamp, log_index
 | `data` | string | hex payload, decoded in phase 5 |
 | `extracted_at` | timestamp (UTC) | download moment; dedup key downstream |
 
-Partition: `dt` (string `YYYY-MM-DD`, projection-enabled Glue tables like
-the existing bronze tables). `chain_id` is NOT a column here — it is
-implied by the table and re-attached in silver.
+Partition: `dt` (string `YYYY-MM-DD`), registered **explicitly** after
+each write via the shared `ingestion.common.partitions.register_partition`
+helper (`ALTER TABLE ADD IF NOT EXISTS PARTITION` through the tagged
+workgroup) — same pattern as the other ingestions; NO partition
+projection, so the `$partitions` convention works on these tables.
+`IF NOT EXISTS` keeps re-runs idempotent at the catalog level.
+`chain_id` is NOT a column here — it is implied by the table and
+re-attached in silver.
 
 ## 5. BigQuery cost guardrails
 
@@ -133,8 +141,9 @@ budget: ~2–4 GB/day Ethereum, more on Polygon; both chains daily fits the
 - **Lambda**: container image, Python 3.13 base, timeout 900 s, memory
   2048 MB, tags `component = "ingestion-onchain"`, `layer = "bronze"`.
   Log group, 7-day retention. Added to `monitored_lambdas`.
-- **Glue**: tables `bronze.ethereum_logs` and `bronze.polygon_logs` with
-  `dt` partition projection, created by Terraform.
+- **Glue**: tables `bronze.ethereum_logs` and `bronze.polygon_logs`
+  created by Terraform, `dt`-partitioned, no projection (partitions are
+  registered by the Lambda; see §4).
 - **IAM (least privilege, NO delete — append-only by design)**:
   - `ssm:GetParameter` on the GCP-key parameter ARN.
   - `s3:PutObject` on `bronze/ethereum_logs/*` and
@@ -144,6 +153,9 @@ budget: ~2–4 GB/day Ethereum, more on Polygon; both chains daily fits the
     its database/catalog); S3 read/write on `athena-results/*` — which
     also covers `dim_contracts` data: with no `s3_data_dir` configured,
     dbt-athena materializes tables under `s3_staging_dir`.
+  - Glue partition write (`GetTable` + `BatchCreatePartition`) on
+    `bronze.ethereum_logs` and `bronze.polygon_logs`, for the explicit
+    partition DDL (mirrors the other ingestion Lambdas).
   - Basic CloudWatch logs.
 - No EventBridge schedule yet — invocation is manual (CLI) until the
   phase-8 daily state machine takes over.
