@@ -112,3 +112,52 @@ def test_chains_config():
     assert set(CHAINS) == {1, 137}
     assert CHAINS[1]["table"] == "ethereum_logs"
     assert CHAINS[137]["table"] == "polygon_logs"
+
+
+class FakeAthenaResults:
+    """start/poll/paginate contract like the real Athena client."""
+
+    def __init__(self, pages, state="SUCCEEDED"):
+        self.pages = pages  # list of lists of address strings (per page)
+        self.state = state
+        self.queries = []
+
+    def start_query_execution(self, QueryString, WorkGroup):
+        self.queries.append({"sql": QueryString, "workgroup": WorkGroup})
+        return {"QueryExecutionId": "fake-id"}
+
+    def get_query_execution(self, QueryExecutionId):
+        return {
+            "QueryExecution": {
+                "Status": {"State": self.state, "StateChangeReason": "fake reason"}
+            }
+        }
+
+    def get_query_results(self, QueryExecutionId, NextToken=None):
+        index = 0 if NextToken is None else int(NextToken)
+        rows = []
+        if index == 0:  # Athena's first page starts with the header row
+            rows.append({"Data": [{"VarCharValue": "contract_address"}]})
+        rows += [{"Data": [{"VarCharValue": a}]} for a in self.pages[index]]
+        result = {"ResultSet": {"Rows": rows}}
+        if index + 1 < len(self.pages):
+            result["NextToken"] = str(index + 1)
+        return result
+
+
+class TestFetchContractAddresses:
+    def test_reads_addresses_across_pages_skipping_header(self):
+        from ingestion.onchain.handler import fetch_contract_addresses
+
+        fake = FakeAthenaResults(pages=[["0xaaa", "0xbbb"], ["0xccc"]])
+        addresses = fetch_contract_addresses(fake, 137)
+        assert addresses == ["0xaaa", "0xbbb", "0xccc"]
+        assert "chain_id = 137" in fake.queries[0]["sql"]
+        assert fake.queries[0]["workgroup"] == "decentraland-data-platform"
+
+    def test_raises_on_failed_query(self):
+        from ingestion.onchain.handler import fetch_contract_addresses
+
+        fake = FakeAthenaResults(pages=[[]], state="FAILED")
+        with pytest.raises(RuntimeError, match="FAILED.*fake reason"):
+            fetch_contract_addresses(fake, 1)
