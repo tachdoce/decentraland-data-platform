@@ -74,7 +74,11 @@ to alert day-over-day registry changes to Slack), 2) event-driven
 `contracts-on-push` state machine: `load-contracts` → `run-dbt`, a
 container-image Lambda that builds `silver.dim_contracts` and its tests;
 curated CSV carries `dcl_contract` + `erc_type`), 3) on-chain Lambdas
-(contract lists + per-contract `extract_from_dt` backfill from S3
-snapshots), 4) prices, 5) decode, 6) dbt silver (incl. unified
+(DONE — single container-image Lambda `extract-onchain-logs`, payload
+`{chain_id: 1|137, date?}` (default UTC today−2), contracts from
+`silver.dim_contracts` via Athena, two-step BigQuery query over
+`goog_blockchain_*` datasets, append-only timestamped parquets with
+`extracted_at` into `bronze.ethereum_logs`/`bronze.polygon_logs`;
+backfill = invoke per day), 4) prices, 5) decode, 6) dbt silver (incl. unified
 `silver.contracts` view), 7) gold+platinum, 8) Step Functions,
 9) dashboard+README.
