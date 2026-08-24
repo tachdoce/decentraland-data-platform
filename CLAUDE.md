@@ -37,6 +37,7 @@ public dashboard. Target budget: ~$0/month (free tiers).
 - Secrets (GCP service account) in SSM Parameter Store.
 - Lambdas with heavy deps (BigQuery, eth_abi, dbt) ship as container images; light ones as zip.
 - Partitions: `dt=YYYY-MM-DD` (daily), `month=YYYY-MM` (monthly). Never name a partition `date` (Athena reserved word).
+- Resolving max/min of a partition column (e.g. latest `dt`) ALWAYS reads the `"<table>$partitions"` metadata table, never the data table (zero bytes scanned). Athena views cannot reference `$partitions`, so models that need it are `materialized='table'`.
 - Chains by numeric EIP-155 `chain_id` (1=ethereum, 137=polygon) in columns AND S3 paths (`chain_id=1/dt=...`). Contract key is always `(chain_id, address)`; addresses lowercase at write time.
 - Bucket: `decentraland-data-platform-${account_id}` (interpolated in Terraform, never hardcoded).
 - Incremental, idempotent extraction by partition; backfill = same code with `{start_date, end_date}`. Small sources (dcl_contracts) use daily full snapshots instead.
