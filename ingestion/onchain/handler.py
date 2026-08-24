@@ -61,7 +61,15 @@ def fetch_contract_addresses(athena, chain_id: int) -> list[str]:
         if first_page:
             rows = rows[1:]  # header row
             first_page = False
-        addresses += [r["Data"][0]["VarCharValue"] for r in rows]
+        for r in rows:
+            # Athena renders NULL as a cell without VarCharValue.
+            value = r["Data"][0].get("VarCharValue")
+            if value is None:
+                raise RuntimeError(
+                    "silver.dim_contracts returned a NULL contract_address "
+                    f"for chain_id={chain_id}; fix the dimension upstream"
+                )
+            addresses.append(value)
         token = page.get("NextToken")
         if not token:
             return addresses

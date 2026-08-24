@@ -138,7 +138,11 @@ class FakeAthenaResults:
         rows = []
         if index == 0:  # Athena's first page starts with the header row
             rows.append({"Data": [{"VarCharValue": "contract_address"}]})
-        rows += [{"Data": [{"VarCharValue": a}]} for a in self.pages[index]]
+        # a None address models Athena's NULL: a Data cell with no VarCharValue
+        rows += [
+            {"Data": [{"VarCharValue": a} if a is not None else {}]}
+            for a in self.pages[index]
+        ]
         result = {"ResultSet": {"Rows": rows}}
         if index + 1 < len(self.pages):
             result["NextToken"] = str(index + 1)
@@ -160,4 +164,13 @@ class TestFetchContractAddresses:
 
         fake = FakeAthenaResults(pages=[[]], state="FAILED")
         with pytest.raises(RuntimeError, match="FAILED.*fake reason"):
+            fetch_contract_addresses(fake, 1)
+
+    def test_null_address_raises_clear_error(self):
+        # Athena renders a NULL cell as Data without VarCharValue; that
+        # must surface as a clear error, not a KeyError.
+        from ingestion.onchain.handler import fetch_contract_addresses
+
+        fake = FakeAthenaResults(pages=[["0xaaa", None]])
+        with pytest.raises(RuntimeError, match="NULL contract_address"):
             fetch_contract_addresses(fake, 1)
