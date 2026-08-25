@@ -1,8 +1,15 @@
 """extract-onchain-logs Lambda: BigQuery public logs -> bronze, one day+chain.
 
 Payload: {"chain_id": 1 | 137, "date": "YYYY-MM-DD"} (date optional,
-default UTC today-2). Append-only: each run writes a new timestamped
-parquet; downstream dedups by latest extracted_at per dt partition.
+default UTC today-2), plus optional {"hour_start": H, "hour_end": H} to
+extract only an intraday window — the chunked fallback (a second
+function, extract-onchain-logs-chunk, same image with a longer timeout)
+uses it when the full-day run fails on a heavy day.
+
+Append-only: each run writes a new timestamped parquet. Downstream
+dedups per dt at row level — latest extracted_at per (transaction_hash,
+log_index) — so full-day re-runs and complementary window chunks both
+resolve correctly.
 """
 
 import datetime
@@ -21,7 +28,9 @@ from ingestion.onchain.extract import (
     build_query,
     object_key,
     parse_event,
+    parse_hours,
     rows_to_parquet,
+    window_bounds,
 )
 
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "decentraland-data-platform")
@@ -87,6 +96,7 @@ def _bigquery_client(ssm) -> bigquery.Client:
 
 def handler(event, context):
     chain_id, run_date = parse_event(event or {})
+    hours = parse_hours(event or {})
     bucket = os.environ["LAKE_BUCKET"]
     table = CHAINS[chain_id]["table"]
 
@@ -99,25 +109,32 @@ def handler(event, context):
 
     client = _bigquery_client(boto3.client("ssm"))
     extracted_at = datetime.datetime.now(datetime.timezone.utc)
-    sql = build_query(chain_id)
+    sql = build_query(chain_id, windowed=hours is not None)
+    query_parameters = [
+        bigquery.ScalarQueryParameter("dt", "DATE", run_date),
+        bigquery.ArrayQueryParameter("addresses", "STRING", addresses),
+    ]
+    if hours is not None:
+        ts_start, ts_end = window_bounds(run_date, hours)
+        query_parameters += [
+            bigquery.ScalarQueryParameter("ts_start", "TIMESTAMP", ts_start),
+            bigquery.ScalarQueryParameter("ts_end", "TIMESTAMP", ts_end),
+        ]
     # Logged for debugging: the exact SQL plus the parameter values.
     print(
-        f"bigquery query (chain_id={chain_id}, dt={run_date}, "
+        f"bigquery query (chain_id={chain_id}, dt={run_date}, hours={hours}, "
         f"{len(addresses)} addresses):\n{sql}\naddresses={addresses}"
     )
     job = client.query(
         sql,
         job_config=bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("dt", "DATE", run_date),
-                bigquery.ArrayQueryParameter("addresses", "STRING", addresses),
-            ],
+            query_parameters=query_parameters,
             maximum_bytes_billed=MAX_BYTES_BILLED,
         ),
     )
     rows = [dict(row) | {"extracted_at": extracted_at} for row in job.result()]
 
-    out_key = object_key(chain_id, run_date, extracted_at)
+    out_key = object_key(chain_id, run_date, extracted_at, hours=hours)
     boto3.client("s3").put_object(
         Bucket=bucket, Key=out_key, Body=rows_to_parquet(rows)
     )
@@ -126,6 +143,7 @@ def handler(event, context):
     result = {
         "chain_id": chain_id,
         "dt": run_date.isoformat(),
+        "hours": hours,
         "rows": len(rows),
         "bytes_processed": job.total_bytes_processed,
         "s3_key": out_key,

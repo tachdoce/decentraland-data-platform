@@ -7,6 +7,7 @@ locals {
     aws_lambda_function.contracts.function_name,
     aws_lambda_function.run_dbt.function_name,
     aws_lambda_function.onchain_logs.function_name,
+    aws_lambda_function.onchain_logs_chunk.function_name,
   ]
 }
 

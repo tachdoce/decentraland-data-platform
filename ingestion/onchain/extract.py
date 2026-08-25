@@ -45,36 +45,81 @@ def parse_event(
     return chain_id, run_date
 
 
-def build_query(chain_id: int) -> str:
+def parse_hours(event: dict) -> tuple[int, int] | None:
+    """Optional intraday window: {"hour_start": 0, "hour_end": 6} -> (0, 6).
+
+    Used by the chunked fallback when the full-day extraction fails.
+    """
+    start, end = event.get("hour_start"), event.get("hour_end")
+    if start is None and end is None:
+        return None
+    if start is None or end is None:
+        raise ValueError("hour_start and hour_end must be provided together")
+    if not (0 <= start <= 24 and 0 <= end <= 24):
+        raise ValueError("hours must be between 0 and 24")
+    if start >= end:
+        raise ValueError("window requires hour_start < hour_end")
+    return start, end
+
+
+def window_bounds(
+    run_date: datetime.date, hours: tuple[int, int]
+) -> tuple[datetime.datetime, datetime.datetime]:
+    """UTC [start, end) timestamps for an intraday hour window; 24 = next midnight."""
+    midnight = datetime.datetime.combine(
+        run_date, datetime.time(0), tzinfo=datetime.timezone.utc
+    )
+    return (
+        midnight + datetime.timedelta(hours=hours[0]),
+        midnight + datetime.timedelta(hours=hours[1]),
+    )
+
+
+def build_query(chain_id: int, windowed: bool = False) -> str:
     """Two-step query: whole transactions that touched Decentraland contracts.
 
     A sale emits events from the marketplace, the NFT, and MANA in one
     transaction; fetching every log of those transactions preserves the
     context decoding needs. @dt and @addresses are BigQuery query
     parameters — values are never interpolated into the SQL text.
+
+    With windowed=True both steps also bound block_timestamp to
+    [@ts_start, @ts_end): a transaction's logs share one block, so no
+    transaction ever splits across windows.
     """
     dataset = CHAINS[chain_id]["dataset"]
+    window = ""
+    if windowed:
+        window = (
+            "\n    AND block_timestamp >= @ts_start"
+            "\n    AND block_timestamp < @ts_end"
+        )
     return f"""\
 WITH tx AS (
   SELECT DISTINCT transaction_hash
   FROM `bigquery-public-data.{dataset}.logs`
   WHERE DATE(block_timestamp) = @dt
-    AND address IN UNNEST(@addresses)
+    AND address IN UNNEST(@addresses){window}
 )
 SELECT transaction_hash, log_index, block_timestamp, address, topics, data
 FROM `bigquery-public-data.{dataset}.logs`
 WHERE DATE(block_timestamp) = @dt
   AND ARRAY_LENGTH(topics) >= 1
-  AND transaction_hash IN (SELECT transaction_hash FROM tx)
+  AND transaction_hash IN (SELECT transaction_hash FROM tx){window}
 ORDER BY block_timestamp, log_index"""
 
 
 def object_key(
-    chain_id: int, run_date: datetime.date, extracted_at: datetime.datetime
+    chain_id: int,
+    run_date: datetime.date,
+    extracted_at: datetime.datetime,
+    hours: tuple[int, int] | None = None,
 ) -> str:
     # Dashes in the time part: colons in S3 keys break URL handling.
     table = CHAINS[chain_id]["table"]
     stamp = extracted_at.strftime("%Y-%m-%d_%H-%M-%S")
+    if hours is not None:
+        stamp += f"_h{hours[0]:02d}-{hours[1]:02d}"
     return f"bronze/{table}/dt={run_date.isoformat()}/{stamp}.parquet"
 
 

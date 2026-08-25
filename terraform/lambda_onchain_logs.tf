@@ -154,3 +154,36 @@ resource "aws_lambda_function" "onchain_logs" {
 
   depends_on = [aws_cloudwatch_log_group.onchain_logs]
 }
+
+# Chunked fallback: same image and role, longer timeout. Invoked with
+# {"hour_start": H, "hour_end": H} windows when the full-day function
+# fails on a heavy day (OOM/timeout); failures only alert Slack.
+resource "aws_cloudwatch_log_group" "onchain_logs_chunk" {
+  name              = "/aws/lambda/extract-onchain-logs-chunk"
+  retention_in_days = 7
+  tags              = local.onchain_logs_tags
+}
+
+resource "aws_lambda_function" "onchain_logs_chunk" {
+  function_name = "extract-onchain-logs-chunk"
+  description   = "Intraday window of Decentraland logs: fallback when the full-day run fails"
+  role          = aws_iam_role.onchain_logs.arn
+  tags          = local.onchain_logs_tags
+
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.onchain_logs.repository_url}@${data.aws_ecr_image.onchain_logs.image_digest}"
+  architectures = ["arm64"]
+
+  timeout     = 300
+  memory_size = 3008
+
+  environment {
+    variables = {
+      LAKE_BUCKET      = local.bucket_name
+      ATHENA_WORKGROUP = aws_athena_workgroup.main.name
+      GCP_KEY_PARAM    = "/decentraland/gcp/bq-service-account-key"
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.onchain_logs_chunk]
+}

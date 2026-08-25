@@ -9,7 +9,9 @@ from ingestion.onchain.extract import (
     build_query,
     object_key,
     parse_event,
+    parse_hours,
     rows_to_parquet,
+    window_bounds,
 )
 
 TODAY = datetime.date(2026, 8, 23)
@@ -38,6 +40,46 @@ class TestParseEvent:
             parse_event({"chain_id": 1, "date": "19/08/2026"})
 
 
+class TestParseHours:
+    def test_absent_hours_returns_none(self):
+        assert parse_hours({"chain_id": 1, "date": "2026-08-19"}) is None
+
+    def test_valid_window(self):
+        assert parse_hours({"chain_id": 1, "hour_start": 0, "hour_end": 6}) == (0, 6)
+
+    def test_last_window_of_the_day(self):
+        assert parse_hours({"hour_start": 18, "hour_end": 24}) == (18, 24)
+
+    def test_only_one_bound_raises(self):
+        with pytest.raises(ValueError, match="hour_start and hour_end"):
+            parse_hours({"hour_start": 0})
+
+    def test_inverted_window_raises(self):
+        with pytest.raises(ValueError, match="hour_start < hour_end"):
+            parse_hours({"hour_start": 12, "hour_end": 6})
+
+    def test_out_of_range_raises(self):
+        with pytest.raises(ValueError, match="between 0 and 24"):
+            parse_hours({"hour_start": 0, "hour_end": 25})
+
+
+class TestWindowBounds:
+    def test_utc_timestamps_from_hours(self):
+        start, end = window_bounds(datetime.date(2019, 11, 16), (0, 6))
+        assert start == datetime.datetime(
+            2019, 11, 16, 0, 0, 0, tzinfo=datetime.timezone.utc
+        )
+        assert end == datetime.datetime(
+            2019, 11, 16, 6, 0, 0, tzinfo=datetime.timezone.utc
+        )
+
+    def test_hour_24_lands_on_next_midnight(self):
+        _, end = window_bounds(datetime.date(2019, 11, 16), (18, 24))
+        assert end == datetime.datetime(
+            2019, 11, 17, 0, 0, 0, tzinfo=datetime.timezone.utc
+        )
+
+
 class TestBuildQuery:
     def test_ethereum_dataset_and_two_step_shape(self):
         sql = build_query(1)
@@ -53,6 +95,19 @@ class TestBuildQuery:
         # parameters only: no quoted dates or addresses in the SQL text
         assert "2026" not in build_query(1)
 
+    def test_default_has_no_window_filter(self):
+        assert "@ts_start" not in build_query(1)
+
+    def test_windowed_filters_both_query_steps(self):
+        # the window must bound the tx CTE (what makes the day cheap) AND
+        # the outer log fetch; a tx's logs share one block so no tx splits
+        sql = build_query(1, windowed=True)
+        assert sql.count("block_timestamp >= @ts_start") == 2
+        assert sql.count("block_timestamp < @ts_end") == 2
+
+    def test_windowed_never_interpolates_values(self):
+        assert "2026" not in build_query(1, windowed=True)
+
 
 class TestObjectKey:
     def test_key_shape_dashes_in_time(self):
@@ -61,6 +116,15 @@ class TestObjectKey:
         )
         key = object_key(1, datetime.date(2026, 8, 19), extracted_at)
         assert key == "bronze/ethereum_logs/dt=2026-08-19/2026-08-20_20-34-59.parquet"
+
+    def test_windowed_key_carries_hour_suffix(self):
+        extracted_at = datetime.datetime(
+            2026, 8, 25, 15, 0, 0, tzinfo=datetime.timezone.utc
+        )
+        key = object_key(1, datetime.date(2019, 11, 16), extracted_at, hours=(0, 6))
+        assert key == (
+            "bronze/ethereum_logs/dt=2019-11-16/2026-08-25_15-00-00_h00-06.parquet"
+        )
 
     def test_polygon_table_prefix(self):
         extracted_at = datetime.datetime(
