@@ -141,8 +141,8 @@ resource "aws_lambda_function" "onchain_logs" {
   image_uri     = "${aws_ecr_repository.onchain_logs.repository_url}@${data.aws_ecr_image.onchain_logs.image_digest}"
   architectures = ["arm64"]
 
-  timeout     = 900
-  memory_size = 2048
+  timeout     = 180
+  memory_size = 3008
 
   environment {
     variables = {
