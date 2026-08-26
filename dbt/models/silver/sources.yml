@@ -21,6 +21,53 @@ sources:
           - name: dt
             description: Snapshot date partition (YYYY-MM-DD).
 
+      - name: ethereum_logs
+        description: >
+          Raw Ethereum mainnet logs for curated contracts (and every log of
+          the transactions touching them), extracted daily from BigQuery.
+          Append-only timestamped parquets; partitioned by dt, partitions
+          registered explicitly by the Lambda.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: address
+            description: Address of the contract that emitted the log, lowercase.
+          - name: topics
+            description: Indexed event topics; topics[1] is the event signature.
+          - name: data
+            description: ABI-encoded non-indexed event payload (hex string).
+          - name: extracted_at
+            description: Extraction timestamp (append-only dedup key).
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
+
+      - name: polygon_logs
+        description: >
+          Raw Polygon mainnet logs, same contract and schema as
+          ethereum_logs. Partitioned by dt; partitions registered
+          explicitly by the Lambda.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: address
+            description: Address of the contract that emitted the log, lowercase.
+          - name: topics
+            description: Indexed event topics; topics[1] is the event signature.
+          - name: data
+            description: ABI-encoded non-indexed event payload (hex string).
+          - name: extracted_at
+            description: Extraction timestamp (append-only dedup key).
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
+
       - name: contracts
         description: >
           Hand-curated contract list ingested from reference/ via
