@@ -11,6 +11,7 @@ Default: single day, UTC today-2. Raises on any failure so the caller
 """
 
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -81,7 +82,9 @@ def handler(event, context):
         workgroup=ATHENA_WORKGROUP,
         ctas_approach=False,
         unload_approach=True,
-        s3_output=f"s3://{bucket}/athena-results/unload/nft_transfers/",
+        # unique per run: UNLOAD refuses an existing target directory
+        s3_output=f"s3://{bucket}/athena-results/unload/nft_transfers/{uuid.uuid4()}/",
+        keep_files=False,
     )
     if df.empty:
         return {"start_date": start, "end_date": end, "rows_by_dt": {}}

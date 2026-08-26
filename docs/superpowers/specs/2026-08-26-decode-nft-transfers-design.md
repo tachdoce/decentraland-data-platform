@@ -1,4 +1,4 @@
-# decode-nft-transfers Lambda (bronze -> staging) — design
+# decode-ethereum-nft-transfers Lambda (bronze -> staging) — design
 
 Date: 2026-08-26
 Status: validated with the user (sections discussed and approved in chat;
@@ -98,7 +98,7 @@ TransferBatch log yields one row per token id.
 
 - New Glue database `staging` + table `staging.ethereum_nft_transfers`
   (parquet, dt partition key, no projection).
-- Lambda `decode-nft-transfers`: zip via `archive_file`, arm64, managed
+- Lambda `decode-ethereum-nft-transfers`: zip via `archive_file`, arm64, managed
   AWSSDKPandas layer, 2048 MB / 300 s to start, tuned with real data.
 - IAM: Athena on the workgroup; Glue read on bronze + silver; Glue
   read/write partitions on staging; S3 read `bronze/*` and `silver/*`,

@@ -1,14 +1,14 @@
-# decode-nft-transfers Lambda Implementation Plan (v2 — awswrangler)
+# decode-ethereum-nft-transfers Lambda Implementation Plan (v2 — awswrangler)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build and deploy `decode-nft-transfers` as a **zip Lambda + managed AWSSDKPandas layer**: `wr.athena.read_sql_query` (UNLOAD approach) → pandas hex→decimal conversion (`token_id` up to 78 digits) → `wr.s3.to_parquet` with `overwrite_partitions` into `staging/ethereum_nft_transfers/dt=…/`.
+**Goal:** Build and deploy `decode-ethereum-nft-transfers` as a **zip Lambda + managed AWSSDKPandas layer**: `wr.athena.read_sql_query` (UNLOAD approach) → pandas hex→decimal conversion (`token_id` up to 78 digits) → `wr.s3.to_parquet` with `overwrite_partitions` into `staging/ethereum_nft_transfers/dt=…/`.
 
 **Architecture:** Athena does the set-based extraction (three event shapes flattened, TransferBatch exploded one row per token id); Python does only the record-level bignum conversion; awswrangler handles Athena polling, parquet IO and Glue partition registration. Idempotent per dt partition.
 
 **Tech Stack:** Python zip Lambda (arm64) + managed layer `AWSSDKPandas-Python3xx-Arm64`, awswrangler 3.x, Terraform (`archive_file`), Athena workgroup `decentraland-data-platform`.
 
-**Spec:** `docs/superpowers/specs/2026-08-26-decode-nft-transfers-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-26-decode-ethereum-nft-transfers-design.md`
 
 ## Global Constraints
 
@@ -206,7 +206,7 @@ Run: `.venv/bin/pytest tests/test_decode_nft_query.py -v` → PASS.
 
 ```bash
 git add decode/__init__.py decode/query.py tests/test_decode_nft_query.py
-git commit -m "feat: extraction query builder for decode-nft-transfers"
+git commit -m "feat: extraction query builder for decode-ethereum-nft-transfers"
 ```
 
 ---
@@ -296,7 +296,7 @@ Run: `.venv/bin/pip install "awswrangler==3.*" "pandas==2.3.*"` then `.venv/bin/
 - [x] **Step 3: Implement `decode/handler.py`**
 
 ```python
-"""decode-nft-transfers Lambda: bronze -> staging.
+"""decode-ethereum-nft-transfers Lambda: bronze -> staging.
 
 wr.athena.read_sql_query runs the set-based extraction (see query.py);
 this handler converts token_id/quantity from hex with Python's
@@ -412,7 +412,7 @@ Run: `.venv/bin/pytest tests/test_decode_nft_query.py tests/test_decode_nft_hand
 
 ```bash
 git add decode/handler.py tests/test_decode_nft_handler.py requirements-dev.txt
-git commit -m "feat: decode-nft-transfers handler (awswrangler + pandas bignum decode)"
+git commit -m "feat: decode-ethereum-nft-transfers handler (awswrangler + pandas bignum decode)"
 ```
 
 ---
@@ -426,7 +426,7 @@ git commit -m "feat: decode-nft-transfers handler (awswrangler + pandas bignum d
 
 **Interfaces:**
 - Consumes: `aws_s3_bucket.lake`, `aws_athena_workgroup.main`, glue databases, `local.bucket_name`, `local.base_tags`, `data.aws_caller_identity.current`.
-- Produces: Lambda `decode-nft-transfers` (zip, arm64, AWSSDKPandas layer), `staging` DB, `staging.ethereum_nft_transfers` table.
+- Produces: Lambda `decode-ethereum-nft-transfers` (zip, arm64, AWSSDKPandas layer), `staging` DB, `staging.ethereum_nft_transfers` table.
 
 - [x] **Step 1: Resolve the newest managed layer for arm64/us-east-1**
 
@@ -450,7 +450,7 @@ resource "aws_glue_catalog_database" "staging" {
 - [x] **Step 3: Create `terraform/table_staging_nft_transfers.tf`**
 
 ```hcl
-# Staging table written by the decode-nft-transfers Lambda (awswrangler
+# Staging table written by the decode-ethereum-nft-transfers Lambda (awswrangler
 # registers the dt partitions on each write). No partition projection, so
 # the "$partitions" metadata convention keeps working.
 resource "aws_glue_catalog_table" "staging_nft_transfers" {
@@ -539,7 +539,7 @@ data "archive_file" "decode_nft" {
 }
 
 resource "aws_iam_role" "decode_nft" {
-  name = "decode-nft-transfers-role"
+  name = "decode-ethereum-nft-transfers-role"
   tags = local.decode_nft_tags
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -635,13 +635,13 @@ resource "aws_iam_role_policy_attachment" "decode_nft_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "decode_nft" {
-  name              = "/aws/lambda/decode-nft-transfers"
+  name              = "/aws/lambda/decode-ethereum-nft-transfers"
   retention_in_days = 7
   tags              = local.decode_nft_tags
 }
 
 resource "aws_lambda_function" "decode_nft" {
-  function_name    = "decode-nft-transfers"
+  function_name    = "decode-ethereum-nft-transfers"
   role             = aws_iam_role.decode_nft.arn
   filename         = data.archive_file.decode_nft.output_path
   source_code_hash = data.archive_file.decode_nft.output_base64sha256
@@ -674,7 +674,7 @@ terraform apply
 
 ```bash
 git add terraform/glue_athena.tf terraform/table_staging_nft_transfers.tf terraform/lambda_decode_nft.tf
-git commit -m "infra: decode-nft-transfers zip Lambda (AWSSDKPandas layer), staging Glue DB and table"
+git commit -m "infra: decode-ethereum-nft-transfers zip Lambda (AWSSDKPandas layer), staging Glue DB and table"
 ```
 
 ---
@@ -689,7 +689,7 @@ git commit -m "infra: decode-nft-transfers zip Lambda (AWSSDKPandas layer), stag
 - [x] **Step 1: Invoke for 2026-08-20**
 
 ```bash
-aws lambda invoke --function-name decode-nft-transfers \
+aws lambda invoke --function-name decode-ethereum-nft-transfers \
   --payload '{"start_date": "2026-08-20", "end_date": "2026-08-20"}' \
   --cli-binary-format raw-in-base64-out --cli-read-timeout 300 /dev/stdout
 ```
@@ -724,6 +724,6 @@ Join staging with bronze on (transaction_hash, log_index) for one 721 row and co
 - [x] **Step 5: Commit docs**
 
 ```bash
-git add docs/superpowers/plans/2026-08-26-decode-nft-transfers.md
-git commit -m "docs: decode-nft-transfers plan (v2 awswrangler) executed and verified"
+git add docs/superpowers/plans/2026-08-26-decode-ethereum-nft-transfers.md
+git commit -m "docs: decode-ethereum-nft-transfers plan (v2 awswrangler) executed and verified"
 ```

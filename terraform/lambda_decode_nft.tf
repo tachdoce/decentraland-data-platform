@@ -28,7 +28,7 @@ data "archive_file" "decode_nft" {
 }
 
 resource "aws_iam_role" "decode_nft" {
-  name = "decode-nft-transfers-role"
+  name = "decode-ethereum-nft-transfers-role"
   tags = local.decode_nft_tags
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -124,13 +124,13 @@ resource "aws_iam_role_policy_attachment" "decode_nft_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "decode_nft" {
-  name              = "/aws/lambda/decode-nft-transfers"
+  name              = "/aws/lambda/decode-ethereum-nft-transfers"
   retention_in_days = 7
   tags              = local.decode_nft_tags
 }
 
 resource "aws_lambda_function" "decode_nft" {
-  function_name    = "decode-nft-transfers"
+  function_name    = "decode-ethereum-nft-transfers"
   role             = aws_iam_role.decode_nft.arn
   filename         = data.archive_file.decode_nft.output_path
   source_code_hash = data.archive_file.decode_nft.output_base64sha256
