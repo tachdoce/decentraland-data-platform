@@ -65,9 +65,9 @@ flows and, later, sale amounts paid in any token.
   `token_address`, `from_address`, `to_address`, `amount_raw`, `dt`.
 - Singular test: unique `(transaction_hash, log_index)` — catches both
   decode bugs and bronze re-extraction duplicates.
-- Overflow guard: fail if any matching bronze log in the loaded range has
-  a non-zero high 160 bits in `data` (amount >= 2^96 would be silently
-  truncated by the split decoding).
+- ~~Overflow guard test~~ replaced by a model filter (decision below):
+  transfers with any of the high 160 bits of `data` set are excluded in
+  the model's WHERE, so the split decoding can never truncate.
 - Failing tests stop the pipeline before platinum, per project convention.
 
 ## Validation (2017 trial)
@@ -84,8 +84,12 @@ transfers/day around the 2017-09-15 post-crowdsale distribution).
   model repeats the same empty window forever. Not expected on Ethereum;
   revisit for sparse chains/events (fix: advance from bronze's calendar
   instead of the model's own partitions).
-- **Amounts >= 2^96 are truncated** by design; the overflow test turns
-  silent truncation into a pipeline failure.
+- **Amounts >= 2^96 are excluded, not truncated.** Found in practice on
+  2018-04-25: a bogus MANA Transfer of ~1.16e77 from the 2018
+  overflow-exploit era (tx `0xde99cab6...`, log_index 27). Such events are
+  not real economic activity, so the model drops them
+  (`substr(data, 3, 40) = '00…0'`); the original overflow test was
+  removed since the WHERE enforces the rule by construction.
 - **Workgroup scan cap (1 GB/query)** is the constraint that sized the
   window; if daily bronze volume grows, shrink the window before raising
   the cap.

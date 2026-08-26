@@ -18,6 +18,9 @@ WITH dedup AS (
     FROM {{ source('bronze', 'ethereum_logs') }}
     WHERE topics[1] = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
       AND cardinality(topics) = 3   -- ERC-721 Transfer has 4 topics
+      -- drop amounts >= 2^96 (high 160 bits set): not real economic
+      -- activity, only bogus events from the 2018 overflow-exploit era
+      AND substr(data, 3, 40) = '0000000000000000000000000000000000000000'
 {% if is_incremental() %}
       AND dt >  {{ max_partition_dt(this) }}
       AND dt <= CAST(CAST({{ max_partition_dt(this) }} AS date) + INTERVAL '20' DAY AS varchar)
@@ -37,7 +40,7 @@ SELECT
     concat('0x', substr(l.topics[2], 27))  AS from_address,
     concat('0x', substr(l.topics[3], 27))  AS to_address,
     -- uint256 split into two 48-bit halves to stay inside decimal(38,0);
-    -- covers amounts < 2^96 (the overflow test guards the rest)
+    -- safe: the WHERE above excludes amounts >= 2^96
     CAST(from_base(substr(l.data, 43, 12), 16) AS decimal(38, 0)) * DECIMAL '281474976710656'
         + CAST(from_base(substr(l.data, 55, 12), 16) AS decimal(38, 0)) AS amount_raw,
     l.extracted_at                         AS bronze_extracted_at,
