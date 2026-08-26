@@ -7,11 +7,24 @@ locals {
   awssdkpandas_layer_arn = "arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python313-Arm64:16"
 }
 
+# source blocks (not source_dir) so the zip keeps the decode/ package
+# directory and the handler resolves as decode.handler.handler
 data "archive_file" "decode_nft" {
   type        = "zip"
-  source_dir  = "${path.module}/../decode"
   output_path = "${path.module}/build/decode_nft.zip"
-  excludes    = ["__pycache__"]
+
+  source {
+    content  = file("${path.module}/../decode/__init__.py")
+    filename = "decode/__init__.py"
+  }
+  source {
+    content  = file("${path.module}/../decode/query.py")
+    filename = "decode/query.py"
+  }
+  source {
+    content  = file("${path.module}/../decode/handler.py")
+    filename = "decode/handler.py"
+  }
 }
 
 resource "aws_iam_role" "decode_nft" {
