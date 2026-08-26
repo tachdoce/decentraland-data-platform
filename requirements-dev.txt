@@ -1,5 +1,7 @@
 pytest==8.*
 pyarrow==21.*
+pandas==2.3.*
+awswrangler==3.*
 boto3==1.*
 ruff==0.*
 dbt-core==1.12.*
