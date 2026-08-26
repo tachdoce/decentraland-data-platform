@@ -8,15 +8,6 @@
 -- ingestion, so it never goes stale).
 {{ config(materialized='table') }}
 
-with latest as (
-
-    -- $partitions reads Glue partition metadata only: no data scanned,
-    -- unlike max(dt) over the table itself.
-    select max(dt) as dt
-    from "bronze"."contracts$partitions"
-
-)
-
 select
     c.chain_id,
     c.contract_address,
@@ -27,5 +18,5 @@ select
     c.extract_from_dt,
     c.dt as snapshot_dt
 from {{ source('bronze', 'contracts') }} c
-inner join latest on c.dt = latest.dt
 where c.erc_type != -1
+  and c.dt = {{ max_partition_dt(source('bronze', 'contracts')) }}
