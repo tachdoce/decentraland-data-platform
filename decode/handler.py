@@ -10,6 +10,7 @@ Default: single day, UTC today-2. Raises on any failure so the caller
 (manual invoke today, Step Functions later) surfaces it.
 """
 
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,9 @@ import awswrangler as wr
 import pandas as pd
 
 from decode.query import build_query
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "decentraland-data-platform")
 GLUE_DATABASE = "staging"
@@ -76,8 +80,10 @@ def handler(event, context):
     # time part (colons in S3 keys break URL handling).
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 
+    sql = build_query(start, end)
+    logger.info("extraction query for %s..%s:\n%s", start, end, sql)
     df = wr.athena.read_sql_query(
-        sql=build_query(start, end),
+        sql=sql,
         database="bronze",
         workgroup=ATHENA_WORKGROUP,
         ctas_approach=False,
