@@ -8,6 +8,11 @@ decentraland:
       region_name: us-east-1
       work_group: decentraland-data-platform
       s3_staging_dir: s3://decentraland-data-platform-683569194224/athena-results/
+      # Table data lands at {s3_data_dir}/{schema}/{table}/ (medallion
+      # layout: silver/, gold/); without this, tables end up under
+      # athena-results/tables/<uuid>/
+      s3_data_dir: s3://decentraland-data-platform-683569194224/
+      s3_data_naming: schema_table
       database: awsdatacatalog
       schema: silver
       threads: 4

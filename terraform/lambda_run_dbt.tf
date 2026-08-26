@@ -112,9 +112,15 @@ resource "aws_iam_role_policy" "run_dbt" {
       {
         Effect = "Allow"
         # DeleteObject: the table materialization drops the previous
-        # build's data files under athena-results/ before recreating.
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-        Resource = "${aws_s3_bucket.lake.arn}/athena-results/*"
+        # build's data files before recreating. Query results stay under
+        # athena-results/; table data lives in the medallion prefixes
+        # (silver/, gold/) via s3_data_dir in profiles.yml.
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = [
+          "${aws_s3_bucket.lake.arn}/athena-results/*",
+          "${aws_s3_bucket.lake.arn}/silver/*",
+          "${aws_s3_bucket.lake.arn}/gold/*",
+        ]
       }
     ]
   })
