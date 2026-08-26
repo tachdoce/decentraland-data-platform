@@ -33,7 +33,7 @@
 **Interfaces:**
 - Produces: `build_query(start_date: str, end_date: str) -> str` — plain SELECT (no UNLOAD wrapper: wrangler adds its own). Output columns, in order: `transaction_hash`, `log_index`, `block_timestamp`, `contract_address`, `erc_type`, `token_id_hex` (64-char hex, no 0x), `quantity_hex` (64-char hex, no 0x), `from_address`, `to_address`, `bronze_extracted_at`, `dt`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 # tests/test_decode_nft_query.py
@@ -61,11 +61,11 @@ def test_query_rejects_bad_dates():
             build_query("2018-06-01", bad)
 ```
 
-- [ ] **Step 2: Run tests, expect import failure**
+- [x] **Step 2: Run tests, expect import failure**
 
 Run: `.venv/bin/pytest tests/test_decode_nft_query.py -v` → FAIL (module not found).
 
-- [ ] **Step 3: Implement `decode/query.py`**
+- [x] **Step 3: Implement `decode/query.py`**
 
 Same SQL as validated in chat (WITH logs / transfers / single_transfers / pre_batch_transfers / pre2_batch_transfers / split_limiters / batch_transfers, UNION ALL), returned as a bare SELECT:
 
@@ -198,11 +198,11 @@ UNION ALL
 SELECT * FROM batch_transfers"""
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/pytest tests/test_decode_nft_query.py -v` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add decode/__init__.py decode/query.py tests/test_decode_nft_query.py
@@ -222,7 +222,7 @@ git commit -m "feat: extraction query builder for decode-nft-transfers"
 - Consumes: `build_query` from Task 1.
 - Produces: `parse_event(event) -> (start, end)`, `postprocess(df) -> df` (pure), `handler(event, context)`. Staging columns: `transaction_hash, log_index, block_timestamp, contract_address, erc_type, token_id, quantity, from_address, to_address, bronze_extracted_at, decoded_at, dt`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 # tests/test_decode_nft_handler.py
@@ -289,11 +289,11 @@ def test_parse_event_range():
         parse_event({"start_date": "2018-06-05", "end_date": "2018-06-01"})
 ```
 
-- [ ] **Step 2: Install dev deps, run tests, expect import failure**
+- [x] **Step 2: Install dev deps, run tests, expect import failure**
 
 Run: `.venv/bin/pip install "awswrangler==3.*" "pandas==2.3.*"` then `.venv/bin/pytest tests/test_decode_nft_handler.py -v` → FAIL (no `decode.handler`).
 
-- [ ] **Step 3: Implement `decode/handler.py`**
+- [x] **Step 3: Implement `decode/handler.py`**
 
 ```python
 """decode-nft-transfers Lambda: bronze -> staging.
@@ -404,11 +404,11 @@ def handler(event, context):
     }
 ```
 
-- [ ] **Step 4: Run tests + ruff**
+- [x] **Step 4: Run tests + ruff**
 
 Run: `.venv/bin/pytest tests/test_decode_nft_query.py tests/test_decode_nft_handler.py -v` → PASS; `.venv/bin/ruff check decode/ tests/` → clean; `.venv/bin/pytest tests/ -q` → whole suite green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add decode/handler.py tests/test_decode_nft_handler.py requirements-dev.txt
@@ -428,7 +428,7 @@ git commit -m "feat: decode-nft-transfers handler (awswrangler + pandas bignum d
 - Consumes: `aws_s3_bucket.lake`, `aws_athena_workgroup.main`, glue databases, `local.bucket_name`, `local.base_tags`, `data.aws_caller_identity.current`.
 - Produces: Lambda `decode-nft-transfers` (zip, arm64, AWSSDKPandas layer), `staging` DB, `staging.ethereum_nft_transfers` table.
 
-- [ ] **Step 1: Resolve the newest managed layer for arm64/us-east-1**
+- [x] **Step 1: Resolve the newest managed layer for arm64/us-east-1**
 
 The AWSSDKPandas layers are published by account `336392948345`. Find the newest Python runtime with an arm64 layer (try 3.13 first, fall back to 3.12):
 
@@ -438,7 +438,7 @@ aws lambda list-layer-versions --layer-name arn:aws:lambda:us-east-1:33639294834
 
 Use the returned ARN verbatim as `LAYER_ARN` below, and match `runtime` to its Python version (`python3.13` or `python3.12`).
 
-- [ ] **Step 2: Add the staging database to `terraform/glue_athena.tf`**
+- [x] **Step 2: Add the staging database to `terraform/glue_athena.tf`**
 
 ```hcl
 resource "aws_glue_catalog_database" "staging" {
@@ -447,7 +447,7 @@ resource "aws_glue_catalog_database" "staging" {
 }
 ```
 
-- [ ] **Step 3: Create `terraform/table_staging_nft_transfers.tf`**
+- [x] **Step 3: Create `terraform/table_staging_nft_transfers.tf`**
 
 ```hcl
 # Staging table written by the decode-nft-transfers Lambda (awswrangler
@@ -524,7 +524,7 @@ resource "aws_glue_catalog_table" "staging_nft_transfers" {
 }
 ```
 
-- [ ] **Step 4: Create `terraform/lambda_decode_nft.tf`** (zip + layer; replace `LAYER_ARN` and `runtime` with Step 1's result)
+- [x] **Step 4: Create `terraform/lambda_decode_nft.tf`** (zip + layer; replace `LAYER_ARN` and `runtime` with Step 1's result)
 
 ```hcl
 locals {
@@ -662,7 +662,7 @@ resource "aws_lambda_function" "decode_nft" {
 }
 ```
 
-- [ ] **Step 5: Plan and apply**
+- [x] **Step 5: Plan and apply**
 
 ```bash
 cd terraform
@@ -670,7 +670,7 @@ terraform plan   # READ the plan: expect ~6 to add, 0 destroy
 terraform apply
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add terraform/glue_athena.tf terraform/table_staging_nft_transfers.tf terraform/lambda_decode_nft.tf
@@ -686,7 +686,7 @@ git commit -m "infra: decode-nft-transfers zip Lambda (AWSSDKPandas layer), stag
 **Interfaces:**
 - Consumes: deployed Lambda. Known-good day: `2026-08-20` (verified in v1: 5,566 transfers — 5,070 ERC-721 + 496 ERC-1155). Note 2018 days have zero standard-721 events (legacy LAND signatures, see spec).
 
-- [ ] **Step 1: Invoke for 2026-08-20**
+- [x] **Step 1: Invoke for 2026-08-20**
 
 ```bash
 aws lambda invoke --function-name decode-nft-transfers \
@@ -696,7 +696,7 @@ aws lambda invoke --function-name decode-nft-transfers \
 
 Expected: `rows_by_dt = {"2026-08-20": 5566}` (same count as v1).
 
-- [ ] **Step 2: Verify in Athena**
+- [x] **Step 2: Verify in Athena**
 
 ```sql
 SELECT erc_type, COUNT(*) AS transfers, MAX(length(token_id)) AS max_digits
@@ -705,7 +705,7 @@ FROM staging.ethereum_nft_transfers WHERE dt = '2026-08-20' GROUP BY erc_type
 
 Expected: 721 → 5070, 1155 → 496, max_digits 78.
 
-- [ ] **Step 3: Idempotency — re-invoke, then check grain**
+- [x] **Step 3: Idempotency — re-invoke, then check grain**
 
 Re-run Step 1, then:
 
@@ -717,11 +717,11 @@ FROM staging.ethereum_nft_transfers WHERE dt = '2026-08-20'
 
 Expected: total = uniq = 5566, and `aws s3 ls` of the dt prefix shows only the newest timestamped file set.
 
-- [ ] **Step 4: Cross-check one token id against bronze**
+- [x] **Step 4: Cross-check one token id against bronze**
 
 Join staging with bronze on (transaction_hash, log_index) for one 721 row and confirm in Python that `token_id == str(int(topics[4][2:], 16))`.
 
-- [ ] **Step 5: Commit docs**
+- [x] **Step 5: Commit docs**
 
 ```bash
 git add docs/superpowers/plans/2026-08-26-decode-nft-transfers.md
