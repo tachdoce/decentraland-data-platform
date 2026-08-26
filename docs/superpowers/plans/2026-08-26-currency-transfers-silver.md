@@ -36,12 +36,12 @@
 **Interfaces:**
 - Produces: macro `max_partition_dt(relation)` — takes a dbt Relation (`this`, `ref()`, `source()`), returns a parenthesized scalar SQL subquery. Model `ethereum_currency_transfers` with columns `transaction_hash` (string), `log_index` (bigint), `block_timestamp` (timestamp), `token_address` (string), `from_address` (string), `to_address` (string), `amount_raw` (decimal(38,0)), `bronze_extracted_at` (timestamp), `processed_at` (timestamp), `dt` (string, partition).
 
-- [ ] **Step 1: Verify the project parses**
+- [x] **Step 1: Verify the project parses**
 
 Run: `cd dbt && ../.venv/bin/dbt parse`
 Expected: `Completed successfully` (warnings about unused configs are acceptable; errors are not).
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add dbt/macros/max_partition_dt.sql dbt/models/silver/ethereum_currency_transfers.sql dbt/models/silver/sources.yml
@@ -61,7 +61,7 @@ git commit -m "feat: silver.ethereum_currency_transfers (SQL-decoded ERC-20 tran
 - Consumes: model `ethereum_currency_transfers` and macro `max_partition_dt` from Task 1.
 - Produces: dbt tests that run on every `dbt build` and stop the pipeline on failure.
 
-- [ ] **Step 1: Add the model block to `dbt/models/silver/schema.yml`**
+- [x] **Step 1: Add the model block to `dbt/models/silver/schema.yml`**
 
 Append (keep existing content untouched):
 
@@ -98,7 +98,7 @@ Append (keep existing content untouched):
         tests: [not_null]
 ```
 
-- [ ] **Step 2: Create the unique-grain singular test**
+- [x] **Step 2: Create the unique-grain singular test**
 
 `dbt/tests/assert_ethereum_currency_transfers_unique_key.sql`:
 
@@ -114,7 +114,7 @@ GROUP BY transaction_hash, log_index
 HAVING COUNT(*) > 1
 ```
 
-- [ ] **Step 3: Create the overflow-guard singular test**
+- [x] **Step 3: Create the overflow-guard singular test**
 
 `dbt/tests/assert_ethereum_currency_transfers_no_overflow.sql`:
 
@@ -135,12 +135,12 @@ WHERE topics[1] = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df52
   AND substr(data, 3, 40) != repeat('0', 40)
 ```
 
-- [ ] **Step 4: Build model + tests together**
+- [x] **Step 4: Build model + tests together**
 
 Run: `cd dbt && ../.venv/bin/dbt build --select ethereum_currency_transfers`
 Expected: 1 incremental model PASS (loads the next 20-day window) and 10 tests PASS (8 not_null + 2 singular). If the overflow test fails, STOP and report the offending rows to the user — do not "fix" by deleting data.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add dbt/models/silver/schema.yml dbt/tests/assert_ethereum_currency_transfers_unique_key.sql dbt/tests/assert_ethereum_currency_transfers_no_overflow.sql
@@ -156,7 +156,7 @@ git commit -m "test: not_null, unique grain and 2^96 overflow guard for ethereum
 **Interfaces:**
 - Consumes: model + tests from Tasks 1–2. Table currently at `max(dt) = 2017-09-16`; Task 2's build advanced it to `2017-10-06`.
 
-- [ ] **Step 1: Run the loop until the window passes 2017-12-31**
+- [x] **Step 1: Run the loop until the window passes 2017-12-31**
 
 Each build advances 20 days (10-06 → 10-26 → 11-15 → 12-05 → 12-25 → 2018-01-14): 5 runs. Stop immediately if any run errors.
 
@@ -169,7 +169,7 @@ done
 
 Expected: 5 successful builds, tests PASS on each.
 
-- [ ] **Step 2: Verify coverage and volume in Athena**
+- [x] **Step 2: Verify coverage and volume in Athena**
 
 ```bash
 QID=$(aws athena start-query-execution --work-group decentraland-data-platform \
@@ -181,7 +181,7 @@ aws athena get-query-results --query-execution-id $QID --output text
 
 Expected: `MIN(dt) = 2017-09-06`, `MAX(dt) <= 2017-12-31` range covered, non-trivial row count (thousands; 2017-09-15 alone has ~5,096). Report the numbers to the user.
 
-- [ ] **Step 3: Verify the scan stayed small**
+- [x] **Step 3: Verify the scan stayed small**
 
 ```bash
 aws athena list-query-executions --work-group decentraland-data-platform --max-results 20 --output json | python3 -c "
@@ -204,7 +204,7 @@ Expected: every dbt query well under 1 GB (tens of MB at most). If any run appro
 **Interfaces:**
 - Consumes: macro `max_partition_dt` (Task 1); existing model `dim_contracts` (unchanged output).
 
-- [ ] **Step 1: Replace the inline `$partitions` CTE**
+- [x] **Step 1: Replace the inline `$partitions` CTE**
 
 In `dbt/models/silver/dim_contracts.sql`, replace:
 
@@ -238,12 +238,12 @@ where c.erc_type != -1
 
 Keep the model's header comment; the macro itself documents the zero-scan rationale. Note this file uses lowercase keywords — leave its existing style as is.
 
-- [ ] **Step 2: Rebuild and verify identical output**
+- [x] **Step 2: Rebuild and verify identical output**
 
 Run: `cd dbt && ../.venv/bin/dbt build --select dim_contracts`
 Expected: model + its schema tests + the two `assert_dim_contracts_*` singular tests all PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add dbt/models/silver/dim_contracts.sql
