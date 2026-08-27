@@ -4,7 +4,7 @@ from decimal import Decimal
 import pandas as pd
 import pytest
 
-from decode.handler import parse_event, postprocess
+from decode.ethereum_nft_handler import parse_event, postprocess
 
 # LAND-style id: x=10 in the high 128 bits, y=20 low -> needs bignum
 LAND_HEX = format((10 << 128) | 20, "064x")

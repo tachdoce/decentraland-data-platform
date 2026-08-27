@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from eth_abi import decode as abi_decode
 
-from decode.wyvern_query import (
+from decode.ethereum_wyvern_query import (
     ORDERS_MATCHED_TOPIC,
     WYVERN_V1,
     WYVERN_V23,

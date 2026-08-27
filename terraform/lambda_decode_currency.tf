@@ -3,7 +3,7 @@ locals {
 }
 
 # source blocks (not source_dir) so the zip keeps the decode/ package
-# directory and the handler resolves as decode.currency_handler.handler.
+# directory and the handler resolves as decode.ethereum_erc20_handler.handler.
 # Only this Lambda's modules ship.
 data "archive_file" "decode_currency" {
   type        = "zip"
@@ -18,12 +18,12 @@ data "archive_file" "decode_currency" {
     filename = "decode/common.py"
   }
   source {
-    content  = file("${path.module}/../decode/currency_query.py")
-    filename = "decode/currency_query.py"
+    content  = file("${path.module}/../decode/ethereum_erc20_query.py")
+    filename = "decode/ethereum_erc20_query.py"
   }
   source {
-    content  = file("${path.module}/../decode/currency_handler.py")
-    filename = "decode/currency_handler.py"
+    content  = file("${path.module}/../decode/ethereum_erc20_handler.py")
+    filename = "decode/ethereum_erc20_handler.py"
   }
 }
 
@@ -129,7 +129,7 @@ resource "aws_lambda_function" "decode_currency" {
   role             = aws_iam_role.decode_currency.arn
   filename         = data.archive_file.decode_currency.output_path
   source_code_hash = data.archive_file.decode_currency.output_base64sha256
-  handler          = "decode.currency_handler.handler"
+  handler          = "decode.ethereum_erc20_handler.handler"
   runtime          = "python3.13"
   architectures    = ["arm64"]
   timeout          = 300

@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pandas as pd
 
-from decode.currency_handler import _FINAL_COLUMNS, postprocess
+from decode.ethereum_erc20_handler import _FINAL_COLUMNS, postprocess
 
 
 def _df(**overrides):
@@ -35,14 +35,14 @@ def test_handler_returns_empty_on_zero_row_unload(monkeypatch):
     # returning an empty frame; the handler must treat it as "no data"
     import awswrangler as wr
 
-    from decode import currency_handler
+    from decode import ethereum_erc20_handler
 
     def _raise(**kwargs):
         raise wr.exceptions.EmptyDataFrame("Query would return untyped, empty dataframe.")
 
     monkeypatch.setenv("LAKE_BUCKET", "test-bucket")
     monkeypatch.setattr(wr.athena, "read_sql_query", _raise)
-    result = currency_handler.handler(
+    result = ethereum_erc20_handler.handler(
         {"start_date": "2017-09-06", "end_date": "2017-09-10"}, None
     )
     assert result == {

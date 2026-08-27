@@ -3,7 +3,7 @@ locals {
 }
 
 # source blocks (not source_dir) so the zip keeps the decode/ package
-# directory and the handler resolves as decode.wyvern_handler.handler.
+# directory and the handler resolves as decode.ethereum_wyvern_handler.handler.
 # Only this Lambda's modules ship.
 data "archive_file" "decode_wyvern" {
   type        = "zip"
@@ -18,12 +18,12 @@ data "archive_file" "decode_wyvern" {
     filename = "decode/common.py"
   }
   source {
-    content  = file("${path.module}/../decode/wyvern_query.py")
-    filename = "decode/wyvern_query.py"
+    content  = file("${path.module}/../decode/ethereum_wyvern_query.py")
+    filename = "decode/ethereum_wyvern_query.py"
   }
   source {
-    content  = file("${path.module}/../decode/wyvern_handler.py")
-    filename = "decode/wyvern_handler.py"
+    content  = file("${path.module}/../decode/ethereum_wyvern_handler.py")
+    filename = "decode/ethereum_wyvern_handler.py"
   }
 }
 
@@ -127,7 +127,7 @@ resource "aws_lambda_function" "decode_wyvern" {
   role             = aws_iam_role.decode_wyvern.arn
   filename         = data.archive_file.decode_wyvern.output_path
   source_code_hash = data.archive_file.decode_wyvern.output_base64sha256
-  handler          = "decode.wyvern_handler.handler"
+  handler          = "decode.ethereum_wyvern_handler.handler"
   runtime          = "python3.13"
   architectures    = ["arm64"]
   timeout          = 300

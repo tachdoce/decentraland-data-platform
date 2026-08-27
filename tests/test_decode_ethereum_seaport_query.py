@@ -1,7 +1,7 @@
 import pytest
 
-from decode.seaport_parser import ORDER_FULFILLED_TOPIC
-from decode.seaport_query import build_query
+from decode.ethereum_seaport_parser import ORDER_FULFILLED_TOPIC
+from decode.ethereum_seaport_query import build_query
 
 
 def test_query_filters_topic_and_range():

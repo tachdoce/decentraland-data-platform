@@ -8,7 +8,7 @@ topic0 already identifies the event.
 
 import re
 
-from decode.seaport_parser import ORDER_FULFILLED_TOPIC
+from decode.ethereum_seaport_parser import ORDER_FULFILLED_TOPIC
 
 _DT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 

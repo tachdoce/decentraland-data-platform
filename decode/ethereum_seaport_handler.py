@@ -23,8 +23,8 @@ import awswrangler as wr
 import pandas as pd
 
 from decode.common import parse_event
-from decode.seaport_parser import parse_order_fulfilled
-from decode.seaport_query import build_query
+from decode.ethereum_seaport_parser import parse_order_fulfilled
+from decode.ethereum_seaport_query import build_query
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

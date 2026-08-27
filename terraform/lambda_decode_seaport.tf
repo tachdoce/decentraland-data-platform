@@ -3,7 +3,7 @@ locals {
 }
 
 # source blocks (not source_dir) so the zip keeps the decode/ package
-# directory and the handler resolves as decode.seaport_handler.handler.
+# directory and the handler resolves as decode.ethereum_seaport_handler.handler.
 # Only this Lambda's modules ship: query.py/handler.py stay out.
 data "archive_file" "decode_seaport" {
   type        = "zip"
@@ -18,16 +18,16 @@ data "archive_file" "decode_seaport" {
     filename = "decode/common.py"
   }
   source {
-    content  = file("${path.module}/../decode/seaport_parser.py")
-    filename = "decode/seaport_parser.py"
+    content  = file("${path.module}/../decode/ethereum_seaport_parser.py")
+    filename = "decode/ethereum_seaport_parser.py"
   }
   source {
-    content  = file("${path.module}/../decode/seaport_query.py")
-    filename = "decode/seaport_query.py"
+    content  = file("${path.module}/../decode/ethereum_seaport_query.py")
+    filename = "decode/ethereum_seaport_query.py"
   }
   source {
-    content  = file("${path.module}/../decode/seaport_handler.py")
-    filename = "decode/seaport_handler.py"
+    content  = file("${path.module}/../decode/ethereum_seaport_handler.py")
+    filename = "decode/ethereum_seaport_handler.py"
   }
 }
 
@@ -133,7 +133,7 @@ resource "aws_lambda_function" "decode_seaport" {
   role             = aws_iam_role.decode_seaport.arn
   filename         = data.archive_file.decode_seaport.output_path
   source_code_hash = data.archive_file.decode_seaport.output_base64sha256
-  handler          = "decode.seaport_handler.handler"
+  handler          = "decode.ethereum_seaport_handler.handler"
   runtime          = "python3.13"
   architectures    = ["arm64"]
   timeout          = 300

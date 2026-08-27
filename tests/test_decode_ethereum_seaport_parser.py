@@ -5,7 +5,7 @@ import pytest
 from eth_abi import decode as abi_decode
 from eth_abi import encode as abi_encode
 
-from decode.seaport_parser import (
+from decode.ethereum_seaport_parser import (
     ORDER_FULFILLED_TOPIC,
     ZERO_ADDRESS,
     parse_order_fulfilled,

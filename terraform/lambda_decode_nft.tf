@@ -8,7 +8,7 @@ locals {
 }
 
 # source blocks (not source_dir) so the zip keeps the decode/ package
-# directory and the handler resolves as decode.handler.handler
+# directory and the handler resolves as decode.ethereum_nft_handler.handler
 data "archive_file" "decode_nft" {
   type        = "zip"
   output_path = "${path.module}/build/decode_nft.zip"
@@ -22,12 +22,12 @@ data "archive_file" "decode_nft" {
     filename = "decode/common.py"
   }
   source {
-    content  = file("${path.module}/../decode/query.py")
-    filename = "decode/query.py"
+    content  = file("${path.module}/../decode/ethereum_nft_query.py")
+    filename = "decode/ethereum_nft_query.py"
   }
   source {
-    content  = file("${path.module}/../decode/handler.py")
-    filename = "decode/handler.py"
+    content  = file("${path.module}/../decode/ethereum_nft_handler.py")
+    filename = "decode/ethereum_nft_handler.py"
   }
 }
 
@@ -138,7 +138,7 @@ resource "aws_lambda_function" "decode_nft" {
   role             = aws_iam_role.decode_nft.arn
   filename         = data.archive_file.decode_nft.output_path
   source_code_hash = data.archive_file.decode_nft.output_base64sha256
-  handler          = "decode.handler.handler"
+  handler          = "decode.ethereum_nft_handler.handler"
   runtime          = "python3.13"
   architectures    = ["arm64"]
   timeout          = 300

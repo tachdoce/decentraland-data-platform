@@ -3,7 +3,7 @@ from decimal import Decimal
 import pandas as pd
 import pytest
 
-from decode.wyvern_handler import _FINAL_COLUMNS, postprocess
+from decode.ethereum_wyvern_handler import _FINAL_COLUMNS, postprocess
 
 
 def _df(**overrides):
@@ -48,14 +48,14 @@ def test_handler_returns_empty_on_zero_row_unload(monkeypatch):
     # returning an empty frame; the handler must treat it as "no data"
     import awswrangler as wr
 
-    from decode import wyvern_handler
+    from decode import ethereum_wyvern_handler
 
     def _raise(**kwargs):
         raise wr.exceptions.EmptyDataFrame("Query would return untyped, empty dataframe.")
 
     monkeypatch.setenv("LAKE_BUCKET", "test-bucket")
     monkeypatch.setattr(wr.athena, "read_sql_query", _raise)
-    result = wyvern_handler.handler(
+    result = ethereum_wyvern_handler.handler(
         {"start_date": "2017-01-01", "end_date": "2017-01-10"}, None
     )
     assert result == {

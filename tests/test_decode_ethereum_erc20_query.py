@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from eth_abi import decode as abi_decode
 
-from decode.currency_query import TRANSFER_TOPIC, build_query
+from decode.ethereum_erc20_query import TRANSFER_TOPIC, build_query
 
 FIXTURE = Path(__file__).parent / "fixtures" / "erc20_transfer_2021-08-15.json"
 

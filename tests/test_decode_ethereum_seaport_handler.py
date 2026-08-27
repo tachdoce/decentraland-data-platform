@@ -5,7 +5,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from decode.seaport_handler import _FINAL_COLUMNS, _to_decimal_list, postprocess
+from decode.ethereum_seaport_handler import (
+    _FINAL_COLUMNS,
+    _to_decimal_list,
+    postprocess,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
