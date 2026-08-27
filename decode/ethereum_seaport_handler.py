@@ -1,7 +1,7 @@
 """decode-ethereum-seaport-sales Lambda: bronze -> staging.
 
 The Athena query only filters (topic0) and fetches raw logs; all ABI
-decoding happens in seaport_parser. Only sales reach staging: orders
+decoding happens in ethereum_seaport_parser. Only sales reach staging: orders
 with order_side 'unknown' (NFT swaps, matchOrders counterlegs) or with
 no payments are dropped here. wr.s3.to_parquet appends timestamped
 parquets (bronze-style): re-runs add rows rather than replace them, so

@@ -1,7 +1,7 @@
 """Builds the Athena query that fetches raw Seaport OrderFulfilled logs.
 
 Filter-and-fetch only: all ABI decoding happens in Python
-(seaport_parser), because the data blob nests two dynamic arrays of
+(ethereum_seaport_parser), because the data blob nests two dynamic arrays of
 structs — unreadable as SQL substr arithmetic. No address filter:
 topic0 already identifies the event.
 """

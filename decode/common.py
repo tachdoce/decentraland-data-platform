@@ -1,4 +1,5 @@
-"""Helpers shared by the decode Lambdas (nft transfers, seaport sales)."""
+"""Helpers shared by all the decode Lambdas (nft transfers, seaport,
+wyvern and erc20)."""
 
 from datetime import datetime, timedelta, timezone
 

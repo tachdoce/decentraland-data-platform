@@ -4,7 +4,7 @@ locals {
 
 # source blocks (not source_dir) so the zip keeps the decode/ package
 # directory and the handler resolves as decode.ethereum_seaport_handler.handler.
-# Only this Lambda's modules ship: query.py/handler.py stay out.
+# Only this Lambda's modules ship.
 data "archive_file" "decode_seaport" {
   type        = "zip"
   output_path = "${path.module}/build/decode_seaport.zip"
