@@ -1,5 +1,5 @@
 """Helpers shared by all the decode Lambdas (nft transfers, seaport,
-wyvern and erc20)."""
+wyvern, erc20 and legacy marketplace)."""
 
 from datetime import datetime, timedelta, timezone
 
