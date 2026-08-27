@@ -46,12 +46,25 @@ each side delivered:
 The decoder therefore classifies every item of both arrays by
 `itemType` and never assumes which side holds the NFTs.
 
-### Verified example
+### Verified examples
 
 Tx `0xd8c5ed0ca8394ec6dace758237697e50ec2b39eb16c53c0cb9e7743166899fcb`
-(dt=2026-08-17, Seaport 1.6) carries two `OrderFulfilled` logs:
-log_index 497 (3-item sale, data length 2498) and 498 (1-item sale,
-data length 1154). Used as a test fixture.
+(dt=2026-08-17, Seaport 1.6) turned out to be an NFT swap
+(`matchOrders`): log_index 497 has NFTs on both sides (LAND #12302 +
+5.2 WETH traded for three LANDs) and log_index 498 is the counterleg
+(3 NFTs offered, empty consideration). Kept as the swap/skip test
+fixture. Tx
+`0x905ace0afc258861541738ad84becc4ddcb49ef1df7bbdd0abe265d6e5dc1286`
+log_index 49 (same dt) is the plain-listing fixture (1 ERC-721 offered,
+1 WETH payment).
+
+### Non-sale orders are skipped
+
+Only sales reach staging. The handler drops decoded orders where
+`order_side = 'unknown'` (NFTs on both sides or on neither — swaps,
+`matchOrders` counterlegs) or with an empty payment array (an order
+that moves NFTs for nothing is not a sale), logging how many rows were
+skipped. The parser itself still classifies everything.
 
 ## Decoding rules
 
@@ -121,9 +134,11 @@ partition projection, so `"$partitions"` keeps working). One row per
 
 Same silhouette as `decode-ethereum-nft-transfers`: zip + AWSSDKPandas
 layer (Python 3.13, ARM64), event `{start_date, end_date}` inclusive
-with default UTC today−2, idempotent via
-`wr.s3.to_parquet(mode="overwrite_partitions")`, timestamped filename
-prefix, unique UNLOAD scratch per run
+with default UTC today−2, append-only writes via
+`wr.s3.to_parquet(mode="append")` (bronze-style: re-runs add rows;
+downstream dbt dedups by `(transaction_hash, log_index)` keeping the
+latest `decoded_at`), timestamped filename prefix, unique UNLOAD
+scratch per run
 (`athena-results/unload/seaport_sales/<uuid>/`). Backfill = invoke per
 day/range in batches of 10.
 

@@ -1,17 +1,13 @@
 locals {
-  decode_nft_tags = { component = "decode", layer = "staging" }
-
-  # AWS-managed AWS SDK for Pandas layer (pandas + pyarrow + awswrangler):
-  # lets this Lambda ship as a plain zip instead of a container image.
-  # Version probed via `aws lambda get-layer-version-by-arn`.
-  awssdkpandas_layer_arn = "arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python313-Arm64:16"
+  decode_seaport_tags = { component = "decode", layer = "staging" }
 }
 
 # source blocks (not source_dir) so the zip keeps the decode/ package
-# directory and the handler resolves as decode.handler.handler
-data "archive_file" "decode_nft" {
+# directory and the handler resolves as decode.seaport_handler.handler.
+# Only this Lambda's modules ship: query.py/handler.py stay out.
+data "archive_file" "decode_seaport" {
   type        = "zip"
-  output_path = "${path.module}/build/decode_nft.zip"
+  output_path = "${path.module}/build/decode_seaport.zip"
 
   source {
     content  = file("${path.module}/../decode/__init__.py")
@@ -22,18 +18,22 @@ data "archive_file" "decode_nft" {
     filename = "decode/common.py"
   }
   source {
-    content  = file("${path.module}/../decode/query.py")
-    filename = "decode/query.py"
+    content  = file("${path.module}/../decode/seaport_parser.py")
+    filename = "decode/seaport_parser.py"
   }
   source {
-    content  = file("${path.module}/../decode/handler.py")
-    filename = "decode/handler.py"
+    content  = file("${path.module}/../decode/seaport_query.py")
+    filename = "decode/seaport_query.py"
+  }
+  source {
+    content  = file("${path.module}/../decode/seaport_handler.py")
+    filename = "decode/seaport_handler.py"
   }
 }
 
-resource "aws_iam_role" "decode_nft" {
-  name = "decode-ethereum-nft-transfers-role"
-  tags = local.decode_nft_tags
+resource "aws_iam_role" "decode_seaport" {
+  name = "decode-ethereum-seaport-sales-role"
+  tags = local.decode_seaport_tags
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -44,9 +44,9 @@ resource "aws_iam_role" "decode_nft" {
   })
 }
 
-resource "aws_iam_role_policy" "decode_nft" {
+resource "aws_iam_role_policy" "decode_seaport" {
   name = "athena-glue-s3"
-  role = aws_iam_role.decode_nft.id
+  role = aws_iam_role.decode_seaport.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -72,10 +72,8 @@ resource "aws_iam_role_policy" "decode_nft" {
         Resource = [
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:catalog",
           aws_glue_catalog_database.bronze.arn,
-          aws_glue_catalog_database.silver.arn,
           aws_glue_catalog_database.staging.arn,
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/bronze/*",
-          "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/silver/*",
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/staging/*",
         ]
       },
@@ -101,13 +99,10 @@ resource "aws_iam_role_policy" "decode_nft" {
         Resource = aws_s3_bucket.lake.arn
       },
       {
-        # read bronze + dim_contracts data for the extraction query
-        Effect = "Allow"
-        Action = "s3:GetObject"
-        Resource = [
-          "${aws_s3_bucket.lake.arn}/bronze/*",
-          "${aws_s3_bucket.lake.arn}/silver/*",
-        ]
+        # read bronze data for the extraction query
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.lake.arn}/bronze/*"
       },
       {
         # wrangler UNLOAD scratch + staging output (overwrite needs delete)
@@ -122,29 +117,29 @@ resource "aws_iam_role_policy" "decode_nft" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "decode_nft_logs" {
-  role       = aws_iam_role.decode_nft.name
+resource "aws_iam_role_policy_attachment" "decode_seaport_logs" {
+  role       = aws_iam_role.decode_seaport.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_cloudwatch_log_group" "decode_nft" {
-  name              = "/aws/lambda/decode-ethereum-nft-transfers"
+resource "aws_cloudwatch_log_group" "decode_seaport" {
+  name              = "/aws/lambda/decode-ethereum-seaport-sales"
   retention_in_days = 7
-  tags              = local.decode_nft_tags
+  tags              = local.decode_seaport_tags
 }
 
-resource "aws_lambda_function" "decode_nft" {
-  function_name    = "decode-ethereum-nft-transfers"
-  role             = aws_iam_role.decode_nft.arn
-  filename         = data.archive_file.decode_nft.output_path
-  source_code_hash = data.archive_file.decode_nft.output_base64sha256
-  handler          = "decode.handler.handler"
+resource "aws_lambda_function" "decode_seaport" {
+  function_name    = "decode-ethereum-seaport-sales"
+  role             = aws_iam_role.decode_seaport.arn
+  filename         = data.archive_file.decode_seaport.output_path
+  source_code_hash = data.archive_file.decode_seaport.output_base64sha256
+  handler          = "decode.seaport_handler.handler"
   runtime          = "python3.13"
   architectures    = ["arm64"]
   timeout          = 300
   memory_size      = 2048
   layers           = [local.awssdkpandas_layer_arn]
-  tags             = local.decode_nft_tags
+  tags             = local.decode_seaport_tags
 
   environment {
     variables = {

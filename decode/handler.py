@@ -13,12 +13,13 @@ Default: single day, UTC today-2. Raises on any failure so the caller
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import awswrangler as wr
 import pandas as pd
 
+from decode.common import parse_event
 from decode.query import build_query
 
 logger = logging.getLogger(__name__)
@@ -45,16 +46,6 @@ _FINAL_COLUMNS = [
     "decoded_at",
     "dt",
 ]
-
-
-def parse_event(event: dict) -> tuple[str, str]:
-    event = event or {}
-    default = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
-    start = event.get("start_date") or default
-    end = event.get("end_date") or start
-    if start > end:
-        raise ValueError(f"start_date {start} after end_date {end}")
-    return start, end
 
 
 def postprocess(df: pd.DataFrame) -> pd.DataFrame:
