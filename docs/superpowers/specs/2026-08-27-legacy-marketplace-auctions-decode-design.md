@@ -124,7 +124,9 @@ timestamped filename prefix, `wr.s3.to_parquet(mode="append")` with
 
 ## Testing
 
-`tests/test_decode_ethereum_legacy_marketplace.py`:
+`tests/test_decode_ethereum_legacy_marketplace_query.py` and
+`tests/test_decode_ethereum_legacy_marketplace_handler.py` (two files,
+same split as the Wyvern tests):
 
 - Real logs embedded as fixtures: at least one of each event type
   pulled from bronze.
