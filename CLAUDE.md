@@ -24,7 +24,7 @@ public dashboard. Target budget: ~$0/month (free tiers).
 | `dbt/` | dbt-athena project: staging → silver → gold (no local seeds/ — uses ../reference) |
 | `platinum_export/` | Lambda gold → platinum |
 | `dashboard/` | Streamlit app |
-| `tests/` | pytest; `test_decode.py` validates eth_abi against manual decoding |
+| `tests/` | pytest; `test_decode_ethereum_*.py` validate the SQL/Python decoding against eth_abi on real log fixtures |
 | `docs/superpowers/specs/` | Designs validated with the user |
 | `docs/superpowers/plans/` | Implementation plans derived from each spec |
 
