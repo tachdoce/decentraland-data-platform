@@ -118,16 +118,20 @@ def handler(event, context):
 
     sql = build_query(start, end)
     logger.info("extraction query for %s..%s:\n%s", start, end, sql)
-    df = wr.athena.read_sql_query(
-        sql=sql,
-        database="bronze",
-        workgroup=ATHENA_WORKGROUP,
-        ctas_approach=False,
-        unload_approach=True,
-        # unique per run: UNLOAD refuses an existing target directory
-        s3_output=f"s3://{bucket}/athena-results/unload/seaport_sales/{uuid.uuid4()}/",
-        keep_files=False,
-    )
+    try:
+        df = wr.athena.read_sql_query(
+            sql=sql,
+            database="bronze",
+            workgroup=ATHENA_WORKGROUP,
+            ctas_approach=False,
+            unload_approach=True,
+            # unique per run: UNLOAD refuses an existing target directory
+            s3_output=f"s3://{bucket}/athena-results/unload/seaport_sales/{uuid.uuid4()}/",
+            keep_files=False,
+        )
+    except wr.exceptions.EmptyDataFrame:
+        # a zero-row UNLOAD raises instead of returning an empty frame
+        return {"start_date": start, "end_date": end, "rows_by_dt": {}}
     if df.empty:
         return {"start_date": start, "end_date": end, "rows_by_dt": {}}
 

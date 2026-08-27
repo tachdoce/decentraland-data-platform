@@ -1,9 +1,13 @@
-"""decode-nft-transfers Lambda: bronze -> staging.
+"""decode-ethereum-wyvern-sales Lambda: bronze -> staging.
 
-wr.athena.read_sql_query runs the set-based extraction (see query.py);
-this handler converts token_id/quantity from hex with Python's
-arbitrary-precision ints and hands the result to wr.s3.to_parquet, which
-overwrites only the touched dt partitions and registers them in Glue.
+The Athena query does the whole decode in SQL (static 3-word layout);
+this handler only converts price from hex with Python's
+arbitrary-precision ints and appends timestamped parquets
+(bronze-style): re-runs add rows rather than replace them, so
+downstream dbt dedups by (transaction_hash, log_index) keeping the
+latest decoded_at. The NFT, buyer/seller, and currency are NOT in the
+event — silver resolves them by joining ethereum_nft_transfers on
+transaction_hash.
 
 Event: {"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"} (inclusive).
 Default: single day, UTC today-2. Raises on any failure so the caller
@@ -20,28 +24,29 @@ import awswrangler as wr
 import pandas as pd
 
 from decode.common import parse_event
-from decode.query import build_query
+from decode.wyvern_query import build_query
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "decentraland-data-platform")
 GLUE_DATABASE = "staging"
-GLUE_TABLE = "ethereum_nft_transfers"
+GLUE_TABLE = "ethereum_wyvern_sales"
 
-# Athena decimal(38,0) ceiling for the quantity column
+# Athena decimal(38,0) ceiling for the price column
 _MAX_DECIMAL38 = 10**38
 
 _FINAL_COLUMNS = [
     "transaction_hash",
     "log_index",
     "block_timestamp",
-    "contract_address",
-    "erc_type",
-    "token_id",
-    "quantity",
-    "from_address",
-    "to_address",
+    "wyvern_address",
+    "buy_hash",
+    "sell_hash",
+    "maker",
+    "taker",
+    "price",
+    "metadata",
     "bronze_extracted_at",
     "decoded_at",
     "dt",
@@ -50,14 +55,14 @@ _FINAL_COLUMNS = [
 
 def postprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["token_id"] = df["token_id_hex"].map(lambda h: str(int(h, 16)))
-    quantities = df["quantity_hex"].map(lambda h: int(h, 16))
-    too_big = quantities >= _MAX_DECIMAL38
+    prices = df["price_hex"].map(lambda h: int(h, 16))
+    too_big = prices >= _MAX_DECIMAL38
     if too_big.any():
         rows = df.loc[too_big, ["transaction_hash", "log_index"]].to_dict("records")
-        raise ValueError(f"quantity exceeds decimal(38,0) in rows: {rows[:5]}")
+        raise ValueError(f"price exceeds decimal(38,0) in rows: {rows[:5]}")
     # Decimal, not int: that is what pyarrow maps onto decimal128(38,0)
-    df["quantity"] = quantities.map(Decimal)
+    df["price"] = prices.map(Decimal)
+    df["wyvern_address"] = df["wyvern_address"].str.lower()
     # floor to ms: the staging schema stores timestamp(ms) and pyarrow
     # refuses lossy casts from microseconds
     df["decoded_at"] = pd.Timestamp.now(tz="UTC").tz_localize(None).floor("ms")
@@ -81,7 +86,7 @@ def handler(event, context):
             ctas_approach=False,
             unload_approach=True,
             # unique per run: UNLOAD refuses an existing target directory
-            s3_output=f"s3://{bucket}/athena-results/unload/nft_transfers/{uuid.uuid4()}/",
+            s3_output=f"s3://{bucket}/athena-results/unload/wyvern_sales/{uuid.uuid4()}/",
             keep_files=False,
         )
     except wr.exceptions.EmptyDataFrame:
@@ -93,15 +98,15 @@ def handler(event, context):
     df = postprocess(df)
     wr.s3.to_parquet(
         df=df,
-        path=f"s3://{bucket}/staging/ethereum_nft_transfers/",
+        path=f"s3://{bucket}/staging/ethereum_wyvern_sales/",
         dataset=True,
         partition_cols=["dt"],
-        mode="overwrite_partitions",
+        mode="append",
         database=GLUE_DATABASE,
         table=GLUE_TABLE,
         filename_prefix=f"{stamp}_",
         compression="snappy",
-        dtype={"quantity": "decimal(38,0)"},
+        dtype={"price": "decimal(38,0)"},
     )
     return {
         "start_date": start,
