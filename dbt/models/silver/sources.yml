@@ -92,3 +92,41 @@ sources:
               (likely marketplace or similar); -1 = excluded from processing.
           - name: dt
             description: Snapshot date partition (YYYY-MM-DD).
+
+  - name: staging
+    description: Decoded layer, written by the decode Lambdas. Glue database `staging`.
+    database: awsdatacatalog
+    schema: staging
+    tables:
+      - name: ethereum_nft_transfers
+        description: >
+          ERC-721/1155 Transfer events decoded from bronze.ethereum_logs by
+          the decode-nft-transfers Lambda. One row per transferred token
+          position (TransferBatch flattened). Partitioned by dt; the Lambda
+          overwrites touched partitions, so re-decoding never duplicates —
+          only double bronze extraction can.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: contract_address
+            description: Address of the NFT contract, lowercase.
+          - name: erc_type
+            description: ERC token standard of the contract (721 or 1155).
+          - name: token_id
+            description: Token id as a decimal string (LAND ids exceed 64 bits).
+          - name: quantity
+            description: Transferred amount; always 1 for ERC-721.
+          - name: from_address
+            description: Sender address, lowercase (zero address = mint).
+          - name: to_address
+            description: Recipient address, lowercase (zero address = burn).
+          - name: bronze_extracted_at
+            description: Extraction timestamp inherited from bronze.
+          - name: decoded_at
+            description: Timestamp of the decode Lambda run.
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
