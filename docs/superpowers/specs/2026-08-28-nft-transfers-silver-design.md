@@ -88,6 +88,15 @@ built fact table that gold can aggregate (mints, holders, sales joins).
   moot; when polygon lands, decide between global `MAX(dt)` and
   per-chain advance — the model changes anyway (UNION).
 - **Identical duplicate rows within one extraction run are
-  undetectable** (e.g. bronze itself containing the same log twice with
-  the same `extracted_at`). Accepted: bronze extraction is
-  overwrite-per-day, so this cannot happen through the normal pipeline.
+  undetectable** (same `bronze_extracted_at`, so the single-run test
+  passes). This materialized during the 2026-08-28 backfill: a retried
+  Athena INSERT left files from two queries in partition
+  `dt=2021-08-23` (751 duplicate rows, silver > staging). Detection:
+  compare per-dt row counts against staging; repair: delete the
+  partition's S3 objects and re-run the model's SELECT for that day via
+  `INSERT INTO`. Backfill verification should always include the
+  per-dt count comparison.
+- **The singular test is bounded to the loaded window**
+  (`max(dt)` minus `nft_transfers_incremental_days`): an unbounded scan
+  exceeded the 1 GB workgroup cap once the table passed ~half its full
+  size. Older partitions were validated when loaded.
