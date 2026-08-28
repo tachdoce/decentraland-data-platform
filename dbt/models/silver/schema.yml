@@ -28,3 +28,45 @@ models:
               arguments:
                 values: [0, 20, 721, 1155]
                 quote: false
+
+  - name: nft_transfers
+    description: >
+      ERC-721/1155 transfers for curated contracts, deduplicated to the
+      latest bronze extraction run per log. One row per transferred token
+      position — a 1155 TransferBatch yields many rows per
+      (chain_id, transaction_hash, log_index), so that key is NOT unique
+      (see tests/assert_nft_transfers_single_run.sql). Incremental,
+      partitioned by (chain_id, dt); runs advance at most
+      nft_transfers_incremental_days (default 10) past the current max dt.
+    columns:
+      - name: transaction_hash
+        data_tests:
+          - not_null
+      - name: log_index
+        data_tests:
+          - not_null
+      - name: contract_address
+        data_tests:
+          - not_null
+      - name: token_id
+        data_tests:
+          - not_null
+      - name: quantity
+        data_tests:
+          - not_null
+      - name: from_address
+        data_tests:
+          - not_null
+      - name: to_address
+        data_tests:
+          - not_null
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 137]
+                quote: false
+      - name: dt
+        data_tests:
+          - not_null
