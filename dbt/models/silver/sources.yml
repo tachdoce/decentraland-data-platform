@@ -93,6 +93,32 @@ sources:
           - name: dt
             description: Snapshot date partition (YYYY-MM-DD).
 
+      - name: erc20_tokens
+        description: >
+          Hand-curated ERC-20 payment-token list ingested from reference/
+          via landing/ -> Lambda -> bronze snapshot. Partitions registered
+          explicitly by the Lambda.
+        columns:
+          - name: chain_id
+            description: EIP-155 numeric chain id (1=ethereum, 137=polygon).
+          - name: contract_address
+            description: >
+              Token contract address, lowercase. The zero address is the
+              native-ETH placeholder used by marketplace trades paid in ETH.
+          - name: name
+            description: Human-readable token name.
+          - name: fsym
+            description: >
+              Price-source ticker. Informative only, NOT unique — GALA v1
+              and v2 share it; joins always use (chain_id, contract_address).
+          - name: decimals
+            description: >
+              ERC-20 decimals for raw-amount conversion
+              (amount = raw / 10^decimals). Not always 18: USDC/USDT use 6;
+              GALA, CUBE and GMT use 8.
+          - name: dt
+            description: Snapshot date partition (YYYY-MM-DD).
+
   - name: staging
     description: Decoded layer, written by the decode Lambdas. Glue database `staging`.
     database: awsdatacatalog
