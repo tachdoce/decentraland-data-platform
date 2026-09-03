@@ -29,6 +29,35 @@ models:
                 values: [0, 20, 721, 1155]
                 quote: false
 
+  - name: dim_erc20_tokens
+    description: >
+      Curated ERC-20 payment-token dimension from the latest
+      bronze.erc20_tokens snapshot. One row per
+      (chain_id, contract_address); fsym is NOT unique (GALA v1/v2).
+    columns:
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 137]
+                quote: false
+      - name: contract_address
+        data_tests:
+          - not_null
+      - name: name
+        data_tests:
+          - not_null
+      - name: fsym
+        data_tests:
+          - not_null
+      - name: decimals
+        data_tests:
+          - not_null
+      - name: snapshot_dt
+        data_tests:
+          - not_null
+
   - name: nft_transfers
     description: >
       ERC-721/1155 transfers for curated contracts, deduplicated to the

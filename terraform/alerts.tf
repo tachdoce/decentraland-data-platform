@@ -8,6 +8,7 @@ locals {
     aws_lambda_function.run_dbt.function_name,
     aws_lambda_function.onchain_logs.function_name,
     aws_lambda_function.onchain_logs_chunk.function_name,
+    aws_lambda_function.erc20_tokens.function_name,
   ]
 }
 

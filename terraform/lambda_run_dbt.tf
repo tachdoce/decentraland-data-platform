@@ -105,9 +105,12 @@ resource "aws_iam_role_policy" "run_dbt" {
         Resource = aws_s3_bucket.lake.arn
       },
       {
-        Effect   = "Allow"
-        Action   = "s3:GetObject"
-        Resource = "${aws_s3_bucket.lake.arn}/bronze/contracts/*"
+        Effect = "Allow"
+        Action = "s3:GetObject"
+        Resource = [
+          "${aws_s3_bucket.lake.arn}/bronze/contracts/*",
+          "${aws_s3_bucket.lake.arn}/bronze/erc20_tokens/*",
+        ]
       },
       {
         Effect = "Allow"

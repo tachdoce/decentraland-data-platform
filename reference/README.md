@@ -41,3 +41,29 @@ To publish after editing:
 aws s3 cp reference/contracts.csv \
   s3://decentraland-data-platform-<account_id>/landing/contracts/
 ```
+
+## erc20_tokens.csv
+
+ERC-20 tokens (plus the native-ETH placeholder) seen as payment currency in
+Decentraland marketplace trades. Symbols and names were resolved from each
+contract address via CoinGecko's contract lookup (Ethplorer for delisted
+tokens); decimals were verified against DefiLlama responses.
+
+- `chain_id` — numeric EIP-155. All rows are 1 (mainnet) today.
+- `contract_address` — token contract, lowercase.
+  `0x0000000000000000000000000000000000000000` is the native-ETH
+  placeholder used when trades are paid in ETH.
+- `name` — human-readable token name.
+- `fsym` — price-source ticker. Informative only and NOT unique — GALA v1
+  (`0x15d4…`) and GALA v2 (`0xd1d2…`) share `GALA`. Joins always use
+  `(chain_id, contract_address)`.
+- `decimals` — ERC-20 decimals for raw-amount conversion
+  (`amount = raw / 10^decimals`). Not always 18: USDC/USDT use 6; GALA,
+  CUBE and STEPN GMT use 8.
+
+To publish after editing:
+
+```bash
+aws s3 cp reference/erc20_tokens.csv \
+  s3://decentraland-data-platform-<account_id>/landing/erc20_tokens/
+```
