@@ -20,6 +20,7 @@ import pyarrow.parquet as pq
 
 from ingestion.common.partitions import ATHENA_WORKGROUP, register_partition
 from ingestion.token_prices.defillama import (
+    batch_coins,
     chart_url,
     chunk_range,
     coin_id,
@@ -130,8 +131,10 @@ def handler(event, context):
     extracted_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     rows = []
     for chunk_start, span in chunk_range(start, end):
-        payload = fetch_chart(chart_url(coin_ids, chunk_start, span))
-        rows.extend(parse_chart_response(payload, chunk_start, span, id_map))
+        # /chart rejects long URLs (HTTP 400), so coins go in batches
+        for batch in batch_coins(coin_ids):
+            payload = fetch_chart(chart_url(batch, chunk_start, span))
+            rows.extend(parse_chart_response(payload, chunk_start, span, id_map))
     for row in rows:
         row["extracted_at"] = extracted_at
 

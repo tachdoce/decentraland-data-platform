@@ -298,3 +298,13 @@ def test_handler_default_payload_is_today(monkeypatch):
     assert len(urls) == 1
     assert f"start={epoch}" in urls[0]
     assert "span=1" in urls[0]
+
+
+def test_batch_coins_splits_preserving_order():
+    from ingestion.token_prices.defillama import batch_coins
+
+    ids = [f"ethereum:0x{i:040x}" for i in range(22)]
+    batches = batch_coins(ids)
+    assert all(len(b) <= 10 for b in batches)
+    assert [i for b in batches for i in b] == ids
+    assert len(batches) == 3

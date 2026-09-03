@@ -13,6 +13,9 @@ BASE_URL = "https://coins.llama.fi"
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 CHAIN_SLUGS = {1: "ethereum"}
 MAX_CHUNK_DAYS = 120
+# /chart rejects long URLs with HTTP 400 (observed: 22 coins / 1174 chars
+# fails, 15 coins / 810 chars works); 10 per call keeps a wide margin.
+MAX_COINS_PER_CALL = 10
 
 
 def coin_id(chain_id: int, address: str) -> str:
@@ -91,6 +94,15 @@ def parse_chart_response(
                 }
             )
     return rows
+
+
+def batch_coins(
+    coin_ids: list[str], max_per_call: int = MAX_COINS_PER_CALL
+) -> list[list[str]]:
+    return [
+        coin_ids[i : i + max_per_call]
+        for i in range(0, len(coin_ids), max_per_call)
+    ]
 
 
 def month_key(day: datetime.date) -> str:
