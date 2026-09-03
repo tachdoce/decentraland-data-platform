@@ -37,7 +37,10 @@ def test_reference_file_known_facts():
     assert by_addr["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"]["decimals"] == 6
     assert by_addr["0xdac17f958d2ee523a2206206994597c13d831ec7"]["decimals"] == 6
     assert by_addr["0xe3c408bd53c31c085a1746af401a4042954ff740"]["decimals"] == 8
-    assert all(r["fetch_price"] is True for r in rows)
+    # GALA v1 (dead contract) is excluded from price extraction so that
+    # symbol-grain price models see a single GALA series (the v2 one)
+    assert by_addr["0x15d4c048f83bd7e37d49ea4c83a07267ec4203da"]["fetch_price"] is False
+    assert sum(1 for r in rows if r["fetch_price"]) == 21
 
 
 HEADER = "chain_id,contract_address,name,fsym,decimals,fetch_price"

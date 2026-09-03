@@ -176,11 +176,32 @@ etc. from their launch dates), MANA count = full range, spot-check MANA
   (bronze + silver) ships.
 - This spec + its plan in `docs/superpowers/`.
 
-## 9. Out of scope (deferred)
+## 9. silver.token_prices (designed in chat on 2026-09-03)
 
-- **silver.token_prices** (dedup by latest `extracted_at`, price-sanity
-  tests): separate brainstorming once bronze runs; same branch and PR.
-- The price join / USD valuation of trades (needs the silver model).
+Validated interactively (no separate spec/plan; bounded change over the
+flows above). `dbt/models/silver/token_prices.sql`, `materialized='table'`,
+NO partitions (user decision). Output is exactly three columns:
+`currency_symbol` (fsym), `price_usd`, `dt` (varchar `YYYY-MM-DD`; note
+`SEQUENCE` over dates yields timestamps, hence the double cast).
+
+- Dedup: `ROW_NUMBER` per `(chain_id, contract_address, dt)` by latest
+  `extracted_at`.
+- Gap-fill: per-token calendar spine (`SEQUENCE`+`UNNEST`) from each
+  token's first priced day to `var('price_fill_end_dt')` (default
+  `2026-08-20`); missing days carry the last known price forward
+  (`LAST_VALUE ... IGNORE NULLS`).
+- Symbol grain is safe because the dimension governs the universe:
+  GALA v1 was set `fetch_price = FALSE` in the CSV (user decision,
+  option "govern by data") and the model filters `fetch_price = TRUE`.
+- Tests: not_null ×3, unique `(currency_symbol, dt)`, positive-price
+  sanity, not-empty.
+- The `token-prices` state machine gained the `RunDbt` step
+  (`select = "source:bronze.token_prices+"`); run-dbt's read policy now
+  includes `bronze/token_prices/*`.
+
+## 10. Out of scope (deferred)
+
+- The price join / USD valuation of trades (uses silver.token_prices).
 - Cron / global orchestration (phase 8).
 - Hourly granularity (unreliable pre-2021), Polygon tokens, CoinGecko
   contrast source.

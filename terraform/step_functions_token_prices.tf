@@ -1,7 +1,7 @@
-# token-prices: manual extraction of DefiLlama daily prices into bronze.
-# No EventBridge trigger (user decision: no cron; phase 8 orchestrates) and
-# no dbt step yet (bronze-only scope; the silver model adds it). Failures
-# use the custom notify-slack contract.
+# token-prices: manual extraction of DefiLlama daily prices into bronze,
+# then dbt build of silver.token_prices. No EventBridge trigger (user
+# decision: no cron; phase 8 orchestrates). Failures use the custom
+# notify-slack contract.
 locals {
   sfn_token_prices_tags = { component = "orchestration", layer = "ops" }
 }
@@ -28,9 +28,12 @@ resource "aws_iam_role_policy" "sfn_token_prices" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = "lambda:InvokeFunction"
-        Resource = aws_lambda_function.token_prices.arn
+        Effect = "Allow"
+        Action = "lambda:InvokeFunction"
+        Resource = [
+          aws_lambda_function.token_prices.arn,
+          aws_lambda_function.run_dbt.arn,
+        ]
       },
       {
         Effect   = "Allow"
@@ -56,6 +59,29 @@ resource "aws_sfn_state_machine" "token_prices" {
         Type       = "Task"
         Resource   = aws_lambda_function.token_prices.arn
         ResultPath = "$.extract"
+        Retry = [{
+          ErrorEquals = [
+            "Lambda.ServiceException",
+            "Lambda.TooManyRequestsException",
+          ]
+          IntervalSeconds = 5
+          MaxAttempts     = 2
+          BackoffRate     = 2
+        }]
+        Catch = [{
+          ErrorEquals = ["States.ALL"]
+          ResultPath  = "$.error"
+          Next        = "NotifyFailure"
+        }]
+        Next = "RunDbt"
+      }
+      RunDbt = {
+        Type     = "Task"
+        Resource = aws_lambda_function.run_dbt.arn
+        Parameters = {
+          select = "source:bronze.token_prices+"
+        }
+        ResultPath = "$.dbt"
         Retry = [{
           ErrorEquals = [
             "Lambda.ServiceException",

@@ -123,6 +123,33 @@ sources:
           - name: dt
             description: Snapshot date partition (YYYY-MM-DD).
 
+      - name: token_prices
+        description: >
+          Daily USD prices from DefiLlama (contract-address lookup) for the
+          curated payment tokens, extracted by extract-token-prices.
+          Append-only timestamped parquets; duplicates resolved downstream
+          by latest extracted_at. Partitioned by month, partitions
+          registered explicitly by the Lambda.
+        columns:
+          - name: chain_id
+            description: EIP-155 numeric chain id (1=ethereum).
+          - name: contract_address
+            description: >
+              Token contract, lowercase. The zero address is the native-ETH
+              placeholder (priced via coingecko:ethereum).
+          - name: dt
+            description: Grid day of the quote (00:00 UTC), from the requested grid.
+          - name: price_usd
+            description: DefiLlama USD price for the grid day.
+          - name: price_ts
+            description: Actual returned sample timestamp (drift audit).
+          - name: confidence
+            description: DefiLlama confidence score for the coin.
+          - name: extracted_at
+            description: Extraction timestamp (append-only dedup key).
+          - name: month
+            description: Month partition (YYYY-MM).
+
   - name: staging
     description: Decoded layer, written by the decode Lambdas. Glue database `staging`.
     database: awsdatacatalog

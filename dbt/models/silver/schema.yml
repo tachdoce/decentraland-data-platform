@@ -61,6 +61,24 @@ models:
         data_tests:
           - not_null
 
+  - name: token_prices
+    description: >
+      Daily USD price per currency symbol, deduped (latest extracted_at)
+      and gap-filled: days without a quote carry the last known price
+      forward up to var('price_fill_end_dt'). One row per
+      (currency_symbol, dt); only dimension rows with fetch_price = TRUE
+      are priced, which keeps symbols unique (GALA v1 excluded).
+    columns:
+      - name: currency_symbol
+        data_tests:
+          - not_null
+      - name: price_usd
+        data_tests:
+          - not_null
+      - name: dt
+        data_tests:
+          - not_null
+
   - name: nft_transfers
     description: >
       ERC-721/1155 transfers for curated contracts, deduplicated to the
