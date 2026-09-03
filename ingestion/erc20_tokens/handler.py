@@ -21,6 +21,7 @@ SCHEMA = pa.schema(
         ("name", pa.string()),
         ("fsym", pa.string()),
         ("decimals", pa.int32()),
+        ("fetch_price", pa.bool_()),
     ]
 )
 

@@ -47,3 +47,19 @@ def test_register_partition_raises_on_failed_ddl(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="FAILED.*fake reason"):
         register_partition("contracts", datetime.date(2026, 8, 21), "test-bucket")
+
+
+def test_register_month_partition_builds_month_ddl(monkeypatch):
+    import ingestion.common.partitions as p
+
+    queries = []
+    monkeypatch.setattr(p.boto3, "client", lambda service: FakeAthena(queries))
+    register_partition(
+        "token_prices", None, "test-bucket", column="month", value="2020-05"
+    )
+
+    assert len(queries) == 1
+    ddl = queries[0]["ddl"]
+    assert "ALTER TABLE bronze.token_prices" in ddl
+    assert "ADD IF NOT EXISTS PARTITION (month = '2020-05')" in ddl
+    assert "LOCATION 's3://test-bucket/bronze/token_prices/month=2020-05/'" in ddl

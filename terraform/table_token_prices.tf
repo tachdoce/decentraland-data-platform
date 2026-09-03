@@ -1,22 +1,22 @@
-resource "aws_glue_catalog_table" "erc20_tokens" {
+resource "aws_glue_catalog_table" "token_prices" {
   database_name = aws_glue_catalog_database.bronze.name
-  name          = "erc20_tokens"
+  name          = "token_prices"
   table_type    = "EXTERNAL_TABLE"
 
-  # No partition projection here: snapshots are infrequent, so the Lambda
-  # registers each partition explicitly (ALTER TABLE ADD PARTITION) and the
-  # catalog lists exactly the partitions that really exist.
+  # Monthly partitions (prices are tiny: ~22 rows/day; daily partitions
+  # would be ~2,800 3-KB files). No partition projection: the Lambda
+  # registers each month explicitly.
   parameters = {
     "classification" = "parquet"
   }
 
   partition_keys {
-    name = "dt"
+    name = "month"
     type = "string"
   }
 
   storage_descriptor {
-    location      = "s3://${local.bucket_name}/bronze/erc20_tokens/"
+    location      = "s3://${local.bucket_name}/bronze/token_prices/"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
 
@@ -33,20 +33,24 @@ resource "aws_glue_catalog_table" "erc20_tokens" {
       type = "string"
     }
     columns {
-      name = "name"
-      type = "string"
+      name = "dt"
+      type = "date"
     }
     columns {
-      name = "fsym"
-      type = "string"
+      name = "price_usd"
+      type = "double"
     }
     columns {
-      name = "decimals"
-      type = "int"
+      name = "price_ts"
+      type = "timestamp"
     }
     columns {
-      name = "fetch_price"
-      type = "boolean"
+      name = "confidence"
+      type = "double"
+    }
+    columns {
+      name = "extracted_at"
+      type = "timestamp"
     }
   }
 }

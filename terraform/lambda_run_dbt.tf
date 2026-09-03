@@ -110,6 +110,7 @@ resource "aws_iam_role_policy" "run_dbt" {
         Resource = [
           "${aws_s3_bucket.lake.arn}/bronze/contracts/*",
           "${aws_s3_bucket.lake.arn}/bronze/erc20_tokens/*",
+          "${aws_s3_bucket.lake.arn}/bronze/token_prices/*",
         ]
       },
       {
