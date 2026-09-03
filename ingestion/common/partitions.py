@@ -9,18 +9,26 @@ import boto3
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "decentraland-data-platform")
 
 
-def register_partition(table: str, run_date: datetime.date, bucket: str) -> None:
+def register_partition(
+    table: str,
+    run_date: datetime.date | None,
+    bucket: str,
+    column: str = "dt",
+    value: str | None = None,
+) -> None:
     """Register a snapshot partition in the Glue catalog via Athena DDL.
 
-    The bronze tables have no partition projection, so each dt must be
-    added explicitly. IF NOT EXISTS keeps same-day re-runs idempotent.
+    The bronze tables have no partition projection, so each partition must
+    be added explicitly. IF NOT EXISTS keeps re-runs idempotent. Default
+    partitioning is daily (column dt, value from run_date); monthly tables
+    pass column="month" and an explicit value.
     """
     athena = boto3.client("athena")
-    dt = run_date.isoformat()
+    value = value if value is not None else run_date.isoformat()
     ddl = (
         f"ALTER TABLE bronze.{table} "
-        f"ADD IF NOT EXISTS PARTITION (dt = '{dt}') "
-        f"LOCATION 's3://{bucket}/bronze/{table}/dt={dt}/'"
+        f"ADD IF NOT EXISTS PARTITION ({column} = '{value}') "
+        f"LOCATION 's3://{bucket}/bronze/{table}/{column}={value}/'"
     )
     query_id = athena.start_query_execution(
         QueryString=ddl, WorkGroup=ATHENA_WORKGROUP
