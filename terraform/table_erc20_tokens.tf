@@ -44,5 +44,9 @@ resource "aws_glue_catalog_table" "erc20_tokens" {
       name = "decimals"
       type = "int"
     }
+    columns {
+      name = "fetch_price"
+      type = "boolean"
+    }
   }
 }

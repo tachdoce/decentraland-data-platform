@@ -116,6 +116,10 @@ sources:
               ERC-20 decimals for raw-amount conversion
               (amount = raw / 10^decimals). Not always 18: USDC/USDT use 6;
               GALA, CUBE and GMT use 8.
+          - name: fetch_price
+            description: >
+              TRUE when the prices Lambda must fetch quotes for this token;
+              FALSE excludes it from price extraction.
           - name: dt
             description: Snapshot date partition (YYYY-MM-DD).
 

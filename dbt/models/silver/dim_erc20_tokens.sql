@@ -14,6 +14,7 @@ SELECT
     t.name,
     t.fsym,
     t.decimals,
+    t.fetch_price,
     t.dt AS snapshot_dt
 FROM {{ source('bronze', 'erc20_tokens') }} t
 WHERE t.dt = {{ max_partition_dt(source('bronze', 'erc20_tokens')) }}

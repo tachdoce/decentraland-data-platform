@@ -37,10 +37,11 @@ def test_reference_file_known_facts():
     assert by_addr["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"]["decimals"] == 6
     assert by_addr["0xdac17f958d2ee523a2206206994597c13d831ec7"]["decimals"] == 6
     assert by_addr["0xe3c408bd53c31c085a1746af401a4042954ff740"]["decimals"] == 8
+    assert all(r["fetch_price"] is True for r in rows)
 
 
-HEADER = "chain_id,contract_address,name,fsym,decimals"
-VALID_LINE = "1,0x0f5d2fb29fb7d3cfee444a200298f468908cc942,Decentraland MANA,MANA,18"
+HEADER = "chain_id,contract_address,name,fsym,decimals,fetch_price"
+VALID_LINE = "1,0x0f5d2fb29fb7d3cfee444a200298f468908cc942,Decentraland MANA,MANA,18,TRUE"
 
 
 def _csv(*lines):
@@ -54,6 +55,7 @@ def _line(**overrides):
         "name": "Decentraland MANA",
         "fsym": "MANA",
         "decimals": "18",
+        "fetch_price": "TRUE",
     }
     fields.update(overrides)
     return ",".join(fields.values())
@@ -62,7 +64,7 @@ def _line(**overrides):
 @pytest.mark.parametrize(
     "bad_csv,match",
     [
-        (_csv("chain_id,address,name,fsym,decimals", VALID_LINE), "bad header"),
+        (_csv("chain_id,address,name,fsym,decimals,fetch_price", VALID_LINE), "bad header"),
         (_csv(HEADER.rsplit(",", 1)[0], _line()), "bad header"),
         (_csv(HEADER, _line(chain_id="99")), "unknown chain_id"),
         (_csv(HEADER, _line(chain_id="x")), "chain_id is not an integer"),
@@ -77,6 +79,8 @@ def _line(**overrides):
         (_csv(HEADER, _line(decimals="abc")), "decimals is not an integer"),
         (_csv(HEADER, _line(decimals="")), "decimals is not an integer"),
         (_csv(HEADER, VALID_LINE, VALID_LINE), "duplicate"),
+        (_csv(HEADER, _line(fetch_price="true")), "fetch_price must be TRUE or FALSE"),
+        (_csv(HEADER, _line(fetch_price="1")), "fetch_price must be TRUE or FALSE"),
         (_csv(HEADER), "no data rows"),
         (b"", "bad header|CSV is empty"),
     ],
@@ -99,8 +103,8 @@ def test_crlf_line_endings_are_accepted():
 
 
 def test_duplicate_fsym_on_different_addresses_is_allowed():
-    line_v1 = "1,0x15d4c048f83bd7e37d49ea4c83a07267ec4203da,Gala,GALA,8"
-    line_v2 = "1,0xd1d2eb1b1e90b638588728b4130137d262c87cae,Gala,GALA,8"
+    line_v1 = "1,0x15d4c048f83bd7e37d49ea4c83a07267ec4203da,Gala,GALA,8,TRUE"
+    line_v2 = "1,0xd1d2eb1b1e90b638588728b4130137d262c87cae,Gala,GALA,8,TRUE"
     rows = parse_and_validate(_csv(HEADER, line_v1, line_v2))
     assert len(rows) == 2
 
@@ -123,6 +127,7 @@ def test_expected_header():
         "name",
         "fsym",
         "decimals",
+        "fetch_price",
     ]
 
 
@@ -141,6 +146,7 @@ def test_rows_to_parquet_roundtrip(tmp_path):
         "name",
         "fsym",
         "decimals",
+        "fetch_price",
     ]
     assert table.num_rows == 22
     assert str(table.schema.field("chain_id").type) == "int32"
@@ -148,6 +154,7 @@ def test_rows_to_parquet_roundtrip(tmp_path):
     assert str(table.schema.field("name").type) == "string"
     assert str(table.schema.field("fsym").type) == "string"
     assert str(table.schema.field("decimals").type) == "int32"
+    assert str(table.schema.field("fetch_price").type) == "bool"
 
 
 class FakeAthena:

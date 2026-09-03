@@ -1,7 +1,8 @@
-"""extract-token-prices Lambda: DefiLlama daily USD prices -> bronze/token_prices.
+"""extract-token-prices Lambda: DefiLlama hourly USD prices -> bronze/token_prices.
 
 Manually triggered (via the token-prices state machine). Payload {} extracts
-today (UTC); {"start_date", "end_date"} backfills a range. Append-only:
+today's hourly ticks (UTC); {"start_date", "end_date"} covers a date range.
+Only dim_erc20_tokens rows with fetch_price = TRUE are priced. Append-only:
 each run writes a new timestamped parquet per touched month partition;
 duplicates are resolved downstream in silver by latest extracted_at.
 """
@@ -32,6 +33,7 @@ SCHEMA = pa.schema(
     [
         ("chain_id", pa.int32()),
         ("contract_address", pa.string()),
+        ("grid_ts", pa.timestamp("us")),
         ("dt", pa.date32()),
         ("price_usd", pa.float64()),
         ("price_ts", pa.timestamp("us")),
@@ -48,7 +50,10 @@ RETRYABLE = {429, 500, 502, 503, 504}
 def fetch_tokens(athena) -> list[tuple[int, str]]:
     """Token universe from the curated dimension (same pattern as the
     onchain Lambda reading silver.dim_contracts)."""
-    sql = "SELECT chain_id, contract_address FROM silver.dim_erc20_tokens"
+    sql = (
+        "SELECT chain_id, contract_address FROM silver.dim_erc20_tokens "
+        "WHERE fetch_price = TRUE"
+    )
     query_id = athena.start_query_execution(
         QueryString=sql, WorkGroup=ATHENA_WORKGROUP
     )["QueryExecutionId"]

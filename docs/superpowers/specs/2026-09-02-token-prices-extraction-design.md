@@ -7,10 +7,15 @@ branch (`token-prices-extraction`).
 
 ## 1. Goal
 
-Daily USD prices for every token in `silver.dim_erc20_tokens`, from
-**2019-01-01** onward, extracted from DefiLlama into `bronze.token_prices` —
+USD prices for every token in `silver.dim_erc20_tokens` with
+`fetch_price = TRUE`, extracted from DefiLlama into `bronze.token_prices` —
 append-only, partitioned by `month=YYYY-MM`, manually triggered (no cron),
-with Slack alerting on failure. These prices will later value marketplace
+with Slack alerting on failure. Grain evolved during implementation (user
+decision on 2026-09-03): the 2019-01-01 → 2026-07-31 history was extracted
+at DAILY grain and stays as-is; from 2026-08-01 onward extraction is
+HOURLY (`period=1h`, new `grid_ts` column; daily-era rows have it NULL).
+The user manually deleted the daily `month=2026-08`/`2026-09` data from S3
+before the hourly re-extraction. These prices will later value marketplace
 trades (`raw_amount / 10^decimals * price_usd`).
 
 ## 2. Source decisions (validated empirically in conversation)
@@ -26,8 +31,11 @@ trades (`raw_amount / 10^decimals * price_usd`).
   can cross calendar days. Therefore `dt` ALWAYS comes from the requested
   grid (`start + n × 1d`), never from the returned timestamp. The returned
   timestamp is kept as `price_ts` for drift auditing.
-- **Daily price semantics**: `dt = D` is the price at grid point
-  `D 00:00 UTC` (day open).
+- **Hourly grid semantics**: one row per requested hourly tick
+  (`grid_ts`); `dt` is the tick's calendar day. Hourly availability is a
+  short rolling window for most tokens (majors like ETH reach further
+  back) — e.g. on 2026-08-01, 11 of 22 tokens had all 24 ticks, several
+  had partial coverage and the rest none. Gaps are accepted by design.
 - **Native ETH**: the zero-address row maps to DefiLlama id
   `coingecko:ethereum`; every other token maps to `ethereum:<address>`.
 - **Gaps**: a token/day DefiLlama has no price for (e.g. PRIME before 2023)
@@ -47,7 +55,9 @@ Steps:
 
 1. **Token universe from Athena** (user decision — same pattern as
    extract-onchain-logs reading silver.dim_contracts): `SELECT chain_id,
-   contract_address FROM silver.dim_erc20_tokens` via
+   contract_address FROM silver.dim_erc20_tokens WHERE fetch_price = TRUE`
+   (the `fetch_price` flag was added to the reference CSV, its validator,
+   `bronze.erc20_tokens` and the dimension for this purpose) via
    `athena:StartQueryExecution` + poll + `GetQueryResults`. Adding a token
    to the CSV automatically prices it on the next run; zero code changes.
 2. **Date range**: payload `{}` → today (UTC) only; payload
@@ -55,10 +65,10 @@ Steps:
    Same code for both (repo convention: backfill = same Lambda).
 3. **Fetch**: `/chart` returns HTTP 400 when `coins × span` exceeds 500
    total points (found empirically during the backfill; bisected to exactly
-   500). Coins therefore go in batches of ≤10 per call and the range in
-   chunks of ≤50 days:
-   `https://coins.llama.fi/chart/<up-to-10-coins>?start=<unix>&span=<≤50>&period=1d`.
-   Full 2019→today backfill ≈ 56 chunks × 3 batches ≈ 168 calls.
+   500). Coins therefore go in batches of ≤10 per call and the hourly
+   grid in chunks of ≤50 hours:
+   `https://coins.llama.fi/chart/<up-to-10-coins>?start=<unix>&span=<≤50>&period=1h`.
+   (The daily-era backfill used the same math in days: ≤50-day chunks.)
 4. **Rows**: one per (token, grid day) with a returned price. `dt` from the
    grid; `price_ts` and `confidence` from the response; `extracted_at` = run
    timestamp (dedup key for the future silver model).
@@ -84,7 +94,8 @@ ParquetHiveSerDe, partition key `month` (string), location
 |---|---|---|
 | `chain_id` | int | from dim_erc20_tokens |
 | `contract_address` | string | lowercase; zero address = native ETH |
-| `dt` | date | grid day (00:00 UTC) |
+| `grid_ts` | timestamp | requested hourly tick; NULL on daily-era rows |
+| `dt` | date | the tick's calendar day |
 | `price_usd` | double | DefiLlama price |
 | `price_ts` | timestamp | actual returned sample timestamp |
 | `confidence` | double | DefiLlama confidence field |

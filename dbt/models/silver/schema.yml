@@ -54,6 +54,9 @@ models:
       - name: decimals
         data_tests:
           - not_null
+      - name: fetch_price
+        data_tests:
+          - not_null
       - name: snapshot_dt
         data_tests:
           - not_null

@@ -15,6 +15,7 @@ EXPECTED_HEADER = [
     "name",
     "fsym",
     "decimals",
+    "fetch_price",
 ]
 
 KNOWN_CHAIN_IDS = {1, 137}
@@ -42,7 +43,7 @@ def parse_and_validate(csv_bytes: bytes) -> list[dict]:
             raise ValueError(
                 f"line {lineno}: expected {len(EXPECTED_HEADER)} fields, got {len(raw)}"
             )
-        chain_raw, address, name, fsym, decimals_raw = raw
+        chain_raw, address, name, fsym, decimals_raw, fetch_raw = raw
 
         try:
             chain_id = int(chain_raw)
@@ -75,6 +76,12 @@ def parse_and_validate(csv_bytes: bytes) -> list[dict]:
         if not 0 <= decimals <= 36:
             raise ValueError(f"line {lineno}: decimals out of range [0, 36]: {decimals}")
 
+        if fetch_raw not in ("TRUE", "FALSE"):
+            raise ValueError(
+                f"line {lineno}: fetch_price must be TRUE or FALSE, got {fetch_raw!r}"
+            )
+        fetch_price = fetch_raw == "TRUE"
+
         key = (chain_id, address)
         if key in seen:
             raise ValueError(
@@ -89,6 +96,7 @@ def parse_and_validate(csv_bytes: bytes) -> list[dict]:
                 "name": name,
                 "fsym": fsym,
                 "decimals": decimals,
+                "fetch_price": fetch_price,
             }
         )
 

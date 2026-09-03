@@ -32,6 +32,12 @@ resource "aws_glue_catalog_table" "token_prices" {
       name = "contract_address"
       type = "string"
     }
+    # Requested hourly grid tick. NULL on rows extracted before the hourly
+    # switch (2019 -> 2026-07 history is daily grain: one row per dt).
+    columns {
+      name = "grid_ts"
+      type = "timestamp"
+    }
     columns {
       name = "dt"
       type = "date"
