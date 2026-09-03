@@ -124,3 +124,98 @@ def test_expected_header():
         "fsym",
         "decimals",
     ]
+
+
+def test_rows_to_parquet_roundtrip(tmp_path):
+    import pyarrow.parquet as pq
+
+    from ingestion.erc20_tokens.handler import rows_to_parquet
+
+    rows = parse_and_validate(FIXTURE_BYTES)
+    out = tmp_path / "erc20_tokens.parquet"
+    out.write_bytes(rows_to_parquet(rows))
+    table = pq.read_table(out)
+    assert table.column_names == [
+        "chain_id",
+        "contract_address",
+        "name",
+        "fsym",
+        "decimals",
+    ]
+    assert table.num_rows == 22
+    assert str(table.schema.field("chain_id").type) == "int32"
+    assert str(table.schema.field("contract_address").type) == "string"
+    assert str(table.schema.field("name").type) == "string"
+    assert str(table.schema.field("fsym").type) == "string"
+    assert str(table.schema.field("decimals").type) == "int32"
+
+
+class FakeAthena:
+    """Records DDL statements and reports a fixed terminal state."""
+
+    def __init__(self, queries, state="SUCCEEDED"):
+        self.queries = queries
+        self.state = state
+
+    def start_query_execution(self, QueryString, WorkGroup):
+        self.queries.append({"ddl": QueryString, "workgroup": WorkGroup})
+        return {"QueryExecutionId": "fake-query-id"}
+
+    def get_query_execution(self, QueryExecutionId):
+        return {
+            "QueryExecution": {
+                "Status": {"State": self.state, "StateChangeReason": "fake reason"}
+            }
+        }
+
+
+def test_handler_reads_event_and_writes_partition(monkeypatch):
+    import ingestion.erc20_tokens.handler as h
+
+    written = {}
+    queries = []
+
+    class FakeS3:
+        def get_object(self, Bucket, Key):
+            import io as _io
+
+            return {"Body": _io.BytesIO(FIXTURE_BYTES)}
+
+        def put_object(self, Bucket, Key, Body):
+            written["bucket"], written["key"], written["body"] = Bucket, Key, Body
+
+    def fake_client(service):
+        if service == "s3":
+            return FakeS3()
+        else:
+            return FakeAthena(queries)
+
+    monkeypatch.setattr(h.boto3, "client", fake_client)
+    event = {
+        "Records": [
+            {
+                "s3": {
+                    "bucket": {"name": "test-bucket"},
+                    "object": {"key": "landing/erc20_tokens/erc20_tokens.csv"},
+                }
+            }
+        ]
+    }
+    result = h.handler(event, None)
+    assert result["rows"] == 22
+    assert written["bucket"] == "test-bucket"
+    assert written["key"].startswith("bronze/erc20_tokens/dt=")
+    assert written["key"].endswith("/erc20_tokens.parquet")
+    assert result["s3_key"] == written["key"]
+    assert result["source_key"] == "landing/erc20_tokens/erc20_tokens.csv"
+    assert len(written["body"]) > 500  # real parquet bytes
+
+    # The partition DDL ran, on the right table/path, in the tagged workgroup
+    assert len(queries) == 1
+    ddl = queries[0]["ddl"]
+    assert "ALTER TABLE bronze.erc20_tokens" in ddl
+    assert "ADD IF NOT EXISTS PARTITION" in ddl
+    dt = written["key"].split("dt=")[1].split("/")[0]
+    assert f"(dt = '{dt}')" in ddl
+    assert f"LOCATION 's3://test-bucket/bronze/erc20_tokens/dt={dt}/'" in ddl
+    assert queries[0]["workgroup"] == "decentraland-data-platform"
