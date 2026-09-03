@@ -43,8 +43,9 @@ def test_chunk_range_single_short_chunk():
 
 def test_chunk_range_splits_and_covers_every_day_once():
     start, end = datetime.date(2019, 1, 1), datetime.date(2019, 12, 31)
-    chunks = chunk_range(start, end)  # 365 days, max 120 per chunk
-    assert all(span <= 120 for _, span in chunks)
+    chunks = chunk_range(start, end)  # 365 days, max 50 per chunk
+    # 50-day cap: /chart rejects coins x span > 500 points (10-coin batches)
+    assert all(span <= 50 for _, span in chunks)
     days = []
     for chunk_start, span in chunks:
         days += [chunk_start + datetime.timedelta(days=i) for i in range(span)]

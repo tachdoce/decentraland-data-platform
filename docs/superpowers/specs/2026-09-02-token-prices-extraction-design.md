@@ -53,9 +53,12 @@ Steps:
 2. **Date range**: payload `{}` → today (UTC) only; payload
    `{"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}` → backfill.
    Same code for both (repo convention: backfill = same Lambda).
-3. **Fetch**: iterate the range in chunks of ≤120 days; one batch call per
-   chunk to `https://coins.llama.fi/chart/<coin1>,<coin2>,…?start=<unix>&span=<days>&period=1d`
-   with all ~22 tokens. Full 2019→today backfill ≈ 24 calls.
+3. **Fetch**: `/chart` returns HTTP 400 when `coins × span` exceeds 500
+   total points (found empirically during the backfill; bisected to exactly
+   500). Coins therefore go in batches of ≤10 per call and the range in
+   chunks of ≤50 days:
+   `https://coins.llama.fi/chart/<up-to-10-coins>?start=<unix>&span=<≤50>&period=1d`.
+   Full 2019→today backfill ≈ 56 chunks × 3 batches ≈ 168 calls.
 4. **Rows**: one per (token, grid day) with a returned price. `dt` from the
    grid; `price_ts` and `confidence` from the response; `extracted_at` = run
    timestamp (dedup key for the future silver model).
