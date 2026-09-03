@@ -9,6 +9,7 @@ locals {
     aws_lambda_function.onchain_logs.function_name,
     aws_lambda_function.onchain_logs_chunk.function_name,
     aws_lambda_function.erc20_tokens.function_name,
+    aws_lambda_function.token_prices.function_name,
   ]
 }
 
