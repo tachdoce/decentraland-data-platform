@@ -424,11 +424,14 @@ seaport_base AS (
 ),
 
 seaport_sales AS (
+    -- matchOrders sales emit two OrderFulfilled (bid + listing), each
+    -- knowing only one party: the bid row keeps the sale and fills the
+    -- missing party from its paired listing; the listing row is dropped.
     SELECT sc.transaction_hash,
         sc.log_index,
         sc.block_timestamp,
-        sc.buyer,
-        sc.seller,
+        COALESCE(sc.buyer, sa.buyer) AS buyer,
+        COALESCE(sc.seller, sa.seller) AS seller,
         sc.nft_contract_address,
         sc.token_id,
         CAST(sc.quantity AS decimal(38,0)) AS quantity,
@@ -453,12 +456,15 @@ seaport_sales AS (
             AND sc.log_index + 1 = sa.log_index
             AND sc.order_side = 'bid'
             AND sa.order_side = 'listing'
+            AND sc.nft_contract_address = sa.nft_contract_address
+            AND sc.token_id = sa.token_id
         LEFT JOIN seaport_base AS sb
             ON sc.transaction_hash = sb.transaction_hash
             AND sc.log_index = sb.log_index + 1
             AND sc.order_side = 'listing'
             AND sb.order_side = 'bid'
-            AND sc.buyer = sc.seller
+            AND sc.nft_contract_address = sb.nft_contract_address
+            AND sc.token_id = sb.token_id
     WHERE sb.transaction_hash IS NULL
 ),
 
