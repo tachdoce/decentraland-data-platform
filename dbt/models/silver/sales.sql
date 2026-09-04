@@ -110,22 +110,27 @@ v2_mana AS (
         AND {{ sales_dt_window('2018-10-11') }}
 ),
 
-v2_sales AS (
+v2_joined AS (
+    -- A multi-sale tx carries one fee/royalty MANA transfer per order,
+    -- each emitted right before its OrderSuccessful; joining on
+    -- (tx, buyer) alone fans out every order against every transfer.
+    -- Keep only the closest transfer preceding each order's log.
     SELECT o.transaction_hash,
         o.log_index,
         o.block_timestamp,
-        o.buyer AS buyer,
-        o.seller AS seller,
-        o.contract_address AS nft_contract_address,
-        o.asset_id AS token_id,
-        CAST(n.quantity AS decimal(38,0)) AS quantity,
-        -- MANA
-        '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' AS currency,
-        CAST(o.total_price AS decimal(38,0)) AS total_amount_raw,
-        CAST(COALESCE(m.amount_raw, 0) AS decimal(38,0)) AS royalty_amount_raw,
+        o.buyer,
+        o.seller,
+        o.contract_address,
+        o.asset_id,
+        n.quantity,
+        o.total_price,
+        m.amount_raw,
+        m.log_index AS mana_log_index,
+        MAX(m.log_index) OVER (
+            PARTITION BY o.dt, o.transaction_hash, o.log_index
+        ) AS closest_mana_log_index,
         o.bronze_extracted_at,
         o.decoded_at,
-        'ethereum_marketplace_v2' AS marketplace,
         o.dt
     FROM v2_orders AS o
         INNER JOIN v2_nfts AS n
@@ -138,8 +143,31 @@ v2_sales AS (
             ON o.transaction_hash = m.transaction_hash
             AND m.decoded_at = m.latest_decoded_at
             AND o.buyer = m.from_address
+            AND m.log_index < o.log_index
     WHERE o.decoded_at = o.latest_decoded_at
         AND n.decoded_at = n.latest_decoded_at
+),
+
+v2_sales AS (
+    SELECT transaction_hash,
+        log_index,
+        block_timestamp,
+        buyer,
+        seller,
+        contract_address AS nft_contract_address,
+        asset_id AS token_id,
+        CAST(quantity AS decimal(38,0)) AS quantity,
+        -- MANA
+        '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' AS currency,
+        CAST(total_price AS decimal(38,0)) AS total_amount_raw,
+        CAST(COALESCE(amount_raw, 0) AS decimal(38,0)) AS royalty_amount_raw,
+        bronze_extracted_at,
+        decoded_at,
+        'ethereum_marketplace_v2' AS marketplace,
+        dt
+    FROM v2_joined
+    WHERE mana_log_index IS NULL
+        OR mana_log_index = closest_mana_log_index
 ),
 
 -- ============================================================
