@@ -438,12 +438,14 @@ seaport_sales AS (
         sc.currency,
         CAST(
             CASE WHEN sa.transaction_hash IS NOT NULL
-                THEN sc.seller_amount_raw ELSE sc.total_amount_raw
+                THEN COALESCE(sc.seller_amount_raw, sa.seller_amount_raw)
+                ELSE sc.total_amount_raw
             END * sc.quantity / sc.nft_count
         AS decimal(38,0)) AS total_amount_raw,
         CAST(
             CASE WHEN sa.transaction_hash IS NOT NULL
-                THEN sa.royalty_amount_raw ELSE sc.royalty_amount_raw
+                THEN COALESCE(sa.royalty_amount_raw, sc.royalty_amount_raw)
+                ELSE sc.royalty_amount_raw
             END * sc.quantity / sc.nft_count
         AS decimal(38,0)) AS royalty_amount_raw,
         sc.bronze_extracted_at,
@@ -453,14 +455,14 @@ seaport_sales AS (
     FROM seaport_base AS sc
         LEFT JOIN seaport_base AS sa
             ON sc.transaction_hash = sa.transaction_hash
-            AND sc.log_index + 1 = sa.log_index
+            AND ABS(sc.log_index - sa.log_index) = 1
             AND sc.order_side = 'bid'
             AND sa.order_side = 'listing'
             AND sc.nft_contract_address = sa.nft_contract_address
             AND sc.token_id = sa.token_id
         LEFT JOIN seaport_base AS sb
             ON sc.transaction_hash = sb.transaction_hash
-            AND sc.log_index = sb.log_index + 1
+            AND ABS(sc.log_index - sb.log_index) = 1
             AND sc.order_side = 'listing'
             AND sb.order_side = 'bid'
             AND sc.nft_contract_address = sb.nft_contract_address
