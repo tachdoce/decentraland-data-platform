@@ -180,15 +180,32 @@ wyvern_nft_scans AS (
 ),
 
 wyvern_nfts AS (
+    -- The inner GROUP BY collapses multi-leg transfers of the SAME
+    -- token in one tx (an 1155 can move as several Transfer logs, e.g.
+    -- qty 554 + qty 1) into one position summing quantity; without it
+    -- the UNNEST downstream would emit duplicate grain rows.
     SELECT transaction_hash,
         ARRAY_AGG(DISTINCT contract_address)[1] AS contract_address,
         ARRAY_AGG(token_id) AS token_ids,
         ARRAY_AGG(quantity) AS quantities,
         ARRAY_AGG(DISTINCT from_address)[1] AS from_address,
         ARRAY_AGG(DISTINCT to_address)[1] AS to_address
-    FROM wyvern_nft_scans
-    WHERE decoded_at = latest_decoded_at
-        AND transaction_hash IN (SELECT transaction_hash FROM wyvern_events)
+    FROM (
+        SELECT transaction_hash,
+            contract_address,
+            token_id,
+            SUM(quantity) AS quantity,
+            from_address,
+            to_address
+        FROM wyvern_nft_scans
+        WHERE decoded_at = latest_decoded_at
+            AND transaction_hash IN (SELECT transaction_hash FROM wyvern_events)
+        GROUP BY transaction_hash,
+            contract_address,
+            token_id,
+            from_address,
+            to_address
+    )
     GROUP BY transaction_hash
     HAVING CARDINALITY(ARRAY_AGG(DISTINCT contract_address)) = 1
         AND CARDINALITY(ARRAY_AGG(DISTINCT from_address)) = 1
