@@ -437,8 +437,12 @@ seaport_sales AS (
         CAST(sc.quantity AS decimal(38,0)) AS quantity,
         sc.currency,
         CAST(
+            -- paired sale: net-to-seller; when neither side names the
+            -- seller (payout routed through a proxy contract), fall
+            -- back to the listing side's total, then the bid's.
             CASE WHEN sa.transaction_hash IS NOT NULL
-                THEN COALESCE(sc.seller_amount_raw, sa.seller_amount_raw)
+                THEN COALESCE(sc.seller_amount_raw, sa.seller_amount_raw,
+                    sa.total_amount_raw, sc.total_amount_raw)
                 ELSE sc.total_amount_raw
             END * sc.quantity / sc.nft_count
         AS decimal(38,0)) AS total_amount_raw,
