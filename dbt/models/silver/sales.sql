@@ -1,9 +1,11 @@
 -- One row per token sold across the five relevant Ethereum marketplaces.
 -- Branch logic comes from the per-marketplace queries validated in the
--- 2026-09-04 spec; every staging scan dedups by latest decoded_at per
--- (dt, transaction_hash, log_index) and applies sales_dt_window for
--- partition pruning (marketplace start/end constants + seed/incremental
--- bounds).
+-- 2026-09-04 spec; every staging scan dedups per (dt, transaction_hash,
+-- log_index) by latest decoded_at AND latest bronze_extracted_at — one
+-- decode run can ingest several bronze copies of the same log (retry
+-- storms), so decoded_at alone cannot separate them — and applies
+-- sales_dt_window for partition pruning (marketplace start/end
+-- constants + seed/incremental bounds).
 --
 -- The initial build seeds dt < '2019-01-01' (legacy auctions,
 -- marketplace v2, wyvern); seaport (2022-06-03) and marketplace trades
@@ -25,9 +27,13 @@ legacy_lands AS (
     SELECT transaction_hash,
         token_id,
         decoded_at,
+        bronze_extracted_at,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_nft_transfers') }}
     -- LAND
     WHERE contract_address = '0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d'
@@ -38,7 +44,10 @@ legacy_auctions AS (
     SELECT *,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_legacy_marketplace_auctions') }}
     WHERE event_name = 'AuctionSuccessful'
         AND {{ sales_dt_window('2018-08-30', '2020-03-07') }}
@@ -67,7 +76,9 @@ legacy_sales AS (
             ON a.transaction_hash = l.transaction_hash
             AND a.asset_id = l.token_id
     WHERE a.decoded_at = a.latest_decoded_at
+        AND a.bronze_extracted_at = a.latest_bronze_extracted_at
         AND l.decoded_at = l.latest_decoded_at
+        AND l.bronze_extracted_at = l.latest_bronze_extracted_at
 ),
 
 -- ============================================================
@@ -78,7 +89,10 @@ v2_nfts AS (
     SELECT *,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_nft_transfers') }}
     WHERE {{ sales_dt_window('2018-10-11') }}
 ),
@@ -87,7 +101,10 @@ v2_orders AS (
     SELECT *,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_marketplace_v2_orders') }}
     WHERE event_name = 'OrderSuccessful'
         AND {{ sales_dt_window('2018-10-11') }}
@@ -97,7 +114,10 @@ v2_mana AS (
     SELECT *,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_currency_transfers') }}
     -- MANA
     WHERE token_address = '0x0f5d2fb29fb7d3cfee444a200298f468908cc942'
@@ -142,10 +162,13 @@ v2_joined AS (
         LEFT JOIN v2_mana AS m
             ON o.transaction_hash = m.transaction_hash
             AND m.decoded_at = m.latest_decoded_at
+            AND m.bronze_extracted_at = m.latest_bronze_extracted_at
             AND o.buyer = m.from_address
             AND m.log_index < o.log_index
     WHERE o.decoded_at = o.latest_decoded_at
+        AND o.bronze_extracted_at = o.latest_bronze_extracted_at
         AND n.decoded_at = n.latest_decoded_at
+        AND n.bronze_extracted_at = n.latest_bronze_extracted_at
 ),
 
 v2_sales AS (
@@ -193,7 +216,10 @@ wyvern_events AS (
         dt,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_wyvern_sales') }}
     WHERE {{ sales_dt_window('2018-11-06', '2022-08-01') }}
 ),
@@ -202,7 +228,10 @@ wyvern_nft_scans AS (
     SELECT *,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_nft_transfers') }}
     WHERE {{ sales_dt_window('2018-11-06', '2022-08-01') }}
 ),
@@ -227,6 +256,7 @@ wyvern_nfts AS (
             to_address
         FROM wyvern_nft_scans
         WHERE decoded_at = latest_decoded_at
+            AND bronze_extracted_at = latest_bronze_extracted_at
             AND transaction_hash IN (SELECT transaction_hash FROM wyvern_events)
         GROUP BY transaction_hash,
             contract_address,
@@ -244,7 +274,10 @@ wyvern_currency_scans AS (
     SELECT *,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_currency_transfers') }}
     WHERE {{ sales_dt_window('2018-11-06', '2022-08-01') }}
 ),
@@ -257,6 +290,7 @@ wyvern_currencies AS (
         ARRAY_AGG(amount_raw)[1] AS amount_raw
     FROM wyvern_currency_scans
     WHERE decoded_at = latest_decoded_at
+        AND bronze_extracted_at = latest_bronze_extracted_at
         AND transaction_hash IN (SELECT transaction_hash FROM wyvern_events)
         -- OpenSea Wallet 2 (fees)
         AND to_address <> '0x5b3256965e7c3cf26e11fcaf296dfc8807c01073'
@@ -278,6 +312,7 @@ wyvern_full AS (
         LEFT JOIN wyvern_currencies AS c
             ON s.transaction_hash = c.transaction_hash
     WHERE s.decoded_at = s.latest_decoded_at
+        AND s.bronze_extracted_at = s.latest_bronze_extracted_at
         AND ((c.transaction_hash IS NULL)
             OR (c.transaction_hash IS NOT NULL
                 AND s.price = c.amount_raw
@@ -327,7 +362,10 @@ seaport_ranked AS (
     SELECT s.*,
         MAX(s.decoded_at) OVER (
             PARTITION BY s.dt, s.transaction_hash, s.log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(s.bronze_extracted_at) OVER (
+            PARTITION BY s.dt, s.transaction_hash, s.log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_seaport_sales') }} AS s
     WHERE {{ sales_dt_window('2022-06-03') }}
 ),
@@ -336,6 +374,7 @@ seaport_orders AS (
     SELECT *
     FROM seaport_ranked
     WHERE decoded_at = latest_decoded_at
+        AND bronze_extracted_at = latest_bronze_extracted_at
 ),
 
 opensea_fee_wallets AS (
@@ -490,7 +529,10 @@ trades_exploded AS (
     SELECT *,
         MAX(decoded_at) OVER (
             PARTITION BY dt, transaction_hash, log_index
-        ) AS latest_decoded_at
+        ) AS latest_decoded_at,
+        MAX(bronze_extracted_at) OVER (
+            PARTITION BY dt, transaction_hash, log_index
+        ) AS latest_bronze_extracted_at
     FROM {{ source('staging', 'ethereum_marketplace_trades') }}
         CROSS JOIN UNNEST(nft_contract_addresses, nft_token_ids)
             AS p (nft_contract_address, nft_token_id)
@@ -516,6 +558,7 @@ trades_sales AS (
         dt
     FROM trades_exploded
     WHERE decoded_at = latest_decoded_at
+        AND bronze_extracted_at = latest_bronze_extracted_at
 ),
 
 unioned AS (
