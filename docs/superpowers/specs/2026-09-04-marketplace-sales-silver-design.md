@@ -41,11 +41,14 @@ Helper scans: `staging.ethereum_nft_transfers` (legacy, v2, wyvern),
    with `insert_overwrite` without touching the others. `chain_id`
    remains a regular column (constant 1 for now); the `ethereum_`
    prefix in the marketplace value keeps S3 paths self-describing.
-4. **Dedup by `decoded_at`** (user decision): keep only rows where
-   `decoded_at = MAX(decoded_at) OVER (PARTITION BY dt,
-   transaction_hash, log_index)`, applied per staging scan. Follow-up
-   task (out of scope here): align `silver.nft_transfers` to the same
-   criterion (it currently dedups by `bronze_extracted_at`).
+4. **Dedup by latest `decoded_at` AND latest `bronze_extracted_at`**
+   per `(dt, transaction_hash, log_index)`, applied per staging scan.
+   Amended during the backfill: `decoded_at` alone (the original user
+   decision) cannot separate several bronze copies of the same log
+   ingested by ONE decode run — a retry storm on 2026-08-24 left 10
+   copies per log, all sharing one `decoded_at`. Follow-up: keep
+   `silver.nft_transfers` on `bronze_extracted_at` (its criterion was
+   right); consider adding the dual criterion there too.
 5. **Bounded incremental, `nft_transfers` pattern.** First build seeds
    `dt < '2019-01-01'` (covers the three 2018 marketplaces; seaport and
    trades arrive via catch-up). Incremental runs load
@@ -105,10 +108,27 @@ Logic is preserved; only these adjustments:
 - **seaport**: drop the invalid `'2022-06-31'` bound (absorbed by the
   macro), the no-op `ORDER BY` inside the `sales` CTE, and the unused
   `contract_name` column from the `dim_contracts` join.
-- **marketplace_v2, known risk (accepted)**: two MANA transfers from
-  the buyer to the fee/royalty wallets in one transaction would fan
-  out the LEFT JOIN and duplicate the sale. Not defended up front; the
-  uniqueness test detects it.
+- **marketplace_v2** (amended during backfill — the accepted fan-out
+  risk materialized): a multi-sale tx emits one fee/royalty MANA
+  transfer per OrderSuccessful, each in a log preceding its order. The
+  royalty join now requires `m.log_index < o.log_index` and keeps only
+  the closest preceding transfer per order.
+- **wyvern** (amended during backfill): an 1155 can move as several
+  Transfer legs of the same token in one tx (e.g. qty 554 + qty 1);
+  legs are pre-aggregated with SUM(quantity) per (tx, contract, token,
+  from, to) before building the arrays, so UNNEST emits one position.
+- **seaport matchOrders** (amended during backfill): a matched sale
+  emits TWO OrderFulfilled halves — a listing knowing only the seller
+  and a bid knowing only the buyer, adjacent logs in either order. The
+  original `sc.buyer = sc.seller` guard never matched (NULLs), leaving
+  two incomplete rows. Halves now pair on: same tx, adjacent logs
+  (`ABS(diff) = 1`), opposite sides, same NFT, and both being
+  incomplete (bid without seller, listing without buyer — a complete
+  adjacent sale of the same NFT is a same-tx flip and stays separate).
+  The bid row keeps the sale with parties COALESCEd across halves; the
+  listing row is dropped. Paired totals stay net-to-seller, falling
+  back to the listing side's total payments when the payout is routed
+  through a proxy contract (no leg names the seller).
 
 ## Tests
 
@@ -143,3 +163,9 @@ the workgroup cap):
   manual `INSERT INTO` of the branch SELECT).
 - **Older partitions are validated when loaded**, not on every run
   (bounded tests).
+- **Scan cap vs window size** (learned during backfill): in the
+  2021-2022 NFT boom a 180-day window exceeds the 1 GB workgroup cap
+  (~26 MB/day of staging scanned); the catch-up used an adaptive
+  window (halve on scan-cap failure down to 20/10/5/1, grow on empty
+  windows). Backfilled 2018-08-30 → 2026-08-20 (staging's end — the
+  decode Lambdas are not in the daily pipeline until phase 8).
