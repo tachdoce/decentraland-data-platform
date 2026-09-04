@@ -457,18 +457,26 @@ seaport_sales AS (
         'ethereum_seaport' AS marketplace,
         sc.dt
     FROM seaport_base AS sc
+        -- matchOrders halves are incomplete by construction: the bid
+        -- half lacks the seller, the listing half lacks the buyer. A
+        -- complete adjacent sale of the same NFT (same-tx flip) is a
+        -- separate sale and must neither pair nor be dropped.
         LEFT JOIN seaport_base AS sa
             ON sc.transaction_hash = sa.transaction_hash
             AND ABS(sc.log_index - sa.log_index) = 1
             AND sc.order_side = 'bid'
+            AND sc.seller IS NULL
             AND sa.order_side = 'listing'
+            AND sa.buyer IS NULL
             AND sc.nft_contract_address = sa.nft_contract_address
             AND sc.token_id = sa.token_id
         LEFT JOIN seaport_base AS sb
             ON sc.transaction_hash = sb.transaction_hash
             AND ABS(sc.log_index - sb.log_index) = 1
             AND sc.order_side = 'listing'
+            AND sc.buyer IS NULL
             AND sb.order_side = 'bid'
+            AND sb.seller IS NULL
             AND sc.nft_contract_address = sb.nft_contract_address
             AND sc.token_id = sb.token_id
     WHERE sb.transaction_hash IS NULL
