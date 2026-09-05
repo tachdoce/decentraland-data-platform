@@ -69,7 +69,7 @@ cd /Users/tachone/proyectos/Decentraland/dbt
 ../.venv/bin/dbt compile --select sales --full-refresh 2>&1 | tail -3
 grep -c "dt < '2019-01-01'" target/compiled/decentraland/models/silver/sales.sql
 ```
-Expected: `Completed successfully` and grep prints `5` (one seed cap per marketplace branch — the default `seed_end_dt` preserves silver.sales byte-for-byte).
+Expected: `Completed successfully` and grep prints `11` (one seed cap per staging scan — the default `seed_end_dt` preserves silver.sales byte-for-byte; diff-verified against main's compiled output during execution).
 
 - [ ] **Step 3: Commit**
 
