@@ -2,7 +2,9 @@
 
 Invoked by the contracts-on-push state machine after a successful CSV
 ingestion. Event: {} for the default selector, {"select": "<selector>"}
-for manual runs. Raises on any dbt failure so Step Functions catches it.
+for manual runs. Every build excludes tag:manual (mandatory-var,
+on-demand models run only via local dbt). Raises on any dbt failure so
+Step Functions catches it.
 """
 
 import os
@@ -10,6 +12,9 @@ import os
 from dbt.cli.main import dbtRunner
 
 DEFAULT_SELECT = "source:bronze.contracts+"
+# Models tagged 'manual' (mandatory-var, on-demand builds) must never run
+# from an automatic selector; --exclude beats even direct selection.
+DEFAULT_EXCLUDE = "tag:manual"
 
 
 def run_dbt(select: str) -> None:
@@ -20,6 +25,7 @@ def run_dbt(select: str) -> None:
         [
             "build",
             "--select", select,
+            "--exclude", DEFAULT_EXCLUDE,
             "--project-dir", project_dir,
             "--profiles-dir", project_dir,
             "--target-path", "/tmp/dbt-target",
