@@ -192,6 +192,56 @@ models:
         data_tests:
           - not_null
 
+  - name: fct_mana_transfers
+    description: >
+      MANA transfers fact: one row per (chain_id, transaction_hash,
+      log_index) with the amount converted exactly from wei
+      (decimal multiplication, never POW — see model comments).
+      Single-token fact: no token_address, no surrogate key, no USD
+      valuation by design. amount_raw = 0 no-ops are dropped; mints and
+      burns (zero address) are kept. Full history from 2017-09-06.
+      Incremental, partitioned by dt; runs advance at most
+      mana_transfers_incremental_days (default 10) past max dt.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - transaction_hash
+              - log_index
+      - dbt_utils.expression_is_true:
+          name: fct_mana_transfers_amount_positive
+          arguments:
+            expression: "amount > 0"
+    columns:
+      - name: transaction_hash
+        data_tests:
+          - not_null
+      - name: log_index
+        data_tests:
+          - not_null
+      - name: block_timestamp
+        data_tests:
+          - not_null
+      - name: from_address
+        data_tests:
+          - not_null
+      - name: to_address
+        data_tests:
+          - not_null
+      - name: amount
+        data_tests:
+          - not_null
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+      - name: dt
+        data_tests:
+          - not_null
+
   - name: dim_currency
     description: >
       Payment-currency dimension. No surrogate key: facts join prices by
