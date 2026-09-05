@@ -5,6 +5,8 @@
 -- JOIN to dim_nft_contracts is intentional: only ERC-721/1155 curated
 -- contracts make it into gold (EstateProxy, erc_type = 0, drops out).
 -- Addresses travel via sk_contract; join the dim to recover them.
+-- quantity = 0 rows (legal ERC-1155 no-op transfers, ~6k in silver)
+-- are filtered out: they move nothing and carry no analytical value.
 --
 -- No dedup here: silver.nft_transfers already keeps one copy per log
 -- and run (latest bronze_extracted_at, insert_overwrite partitions).
@@ -38,9 +40,10 @@ FROM {{ ref('nft_transfers') }} AS t
     INNER JOIN {{ ref('dim_nft_contracts') }} AS c
         ON t.chain_id = c.chain_id
         AND t.contract_address = c.contract_address
+WHERE t.quantity > 0
 {% if is_incremental() %}
-WHERE t.dt > {{ max_partition_dt(this) }}
+  AND t.dt > {{ max_partition_dt(this) }}
   AND t.dt <= {{ max_partition_dt_offset(this, var('nft_transfers_incremental_days', 10)) }}
 {% else %}
-WHERE t.dt < '2019-01-01'
+  AND t.dt < '2019-01-01'
 {% endif %}

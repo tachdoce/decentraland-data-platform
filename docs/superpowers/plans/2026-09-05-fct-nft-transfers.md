@@ -192,7 +192,8 @@ SELECT
          INNER JOIN "gold"."dim_nft_contracts" AS c
              ON t.chain_id = c.chain_id
              AND t.contract_address = c.contract_address
-     WHERE t.dt < '2019-01-01') AS expected_rows;
+     WHERE t.dt < '2019-01-01'
+       AND t.quantity > 0) AS expected_rows;
 ```
 Expected: `gold_rows = expected_rows`. If they differ, STOP and investigate.
 
@@ -241,6 +242,7 @@ FROM "silver"."nft_transfers" AS t
     INNER JOIN "gold"."dim_nft_contracts" AS c
         ON t.chain_id = c.chain_id
         AND t.contract_address = c.contract_address
+WHERE t.quantity > 0
 GROUP BY 1 ORDER BY 1;
 ```
 ```sql

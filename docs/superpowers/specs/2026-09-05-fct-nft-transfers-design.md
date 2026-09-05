@@ -26,6 +26,11 @@ grain** — silver doesn't carry one either.
 - The INNER JOIN is intentional: contracts outside `dim_nft_contracts`
   drop out of gold. In particular EstateProxy (`erc_type = 0`, prior user
   decision) is excluded, matching `fct_sales` behavior.
+- `quantity = 0` rows are filtered out (`WHERE t.quantity > 0`). The
+  ERC-1155 standard allows zero-value transfers; silver keeps them
+  faithfully (~6,150 rows across 45 contracts, 2020-06-15 onward), but
+  they move nothing and carry no analytical value, so gold drops them.
+  Decided during the backfill when the `quantity > 0` test caught them.
 
 ## No dedup in gold
 
