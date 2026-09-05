@@ -187,3 +187,231 @@ sources:
             description: Timestamp of the decode Lambda run.
           - name: dt
             description: Block date partition (YYYY-MM-DD).
+
+      - name: ethereum_currency_transfers
+        description: >
+          ERC-20 Transfer events decoded from bronze.ethereum_logs by the
+          decode-ethereum-currency-transfers Lambda. Append-only timestamped
+          parquets; downstream dedups by latest decoded_at. Partitioned by dt.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: token_address
+            description: ERC-20 token contract, lowercase.
+          - name: from_address
+            description: Sender address, lowercase.
+          - name: to_address
+            description: Recipient address, lowercase.
+          - name: amount_raw
+            description: Raw token amount, decimal(38,0).
+          - name: bronze_extracted_at
+            description: Extraction timestamp inherited from bronze.
+          - name: decoded_at
+            description: Timestamp of the decode Lambda run.
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
+
+      - name: ethereum_legacy_marketplace_auctions
+        description: >
+          LegacyMarketplace auction events (LAND-only marketplace,
+          2018-08-30 to 2020-03-07). Append-only; dedup downstream by
+          latest decoded_at. Partitioned by dt.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: event_name
+            description: AuctionCreated / AuctionSuccessful / AuctionCancelled.
+          - name: auction_id
+            description: Auction id.
+          - name: asset_id
+            description: LAND token id as a decimal string.
+          - name: seller
+            description: Seller address, lowercase.
+          - name: winner
+            description: Auction winner (the buyer), lowercase.
+          - name: total_price
+            description: MANA raw price, decimal(38,0).
+          - name: expires_at
+            description: Auction expiry (decoded from unix milliseconds).
+          - name: bronze_extracted_at
+            description: Extraction timestamp inherited from bronze.
+          - name: decoded_at
+            description: Timestamp of the decode Lambda run.
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
+
+      - name: ethereum_marketplace_v2_orders
+        description: >
+          Marketplace v2 order events (multi-collection, MANA-only).
+          Append-only; dedup downstream by latest decoded_at.
+          Partitioned by dt.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: event_name
+            description: OrderCreated / OrderSuccessful / OrderCancelled.
+          - name: order_id
+            description: Order id.
+          - name: asset_id
+            description: Token id as a decimal string.
+          - name: contract_address
+            description: NFT contract sold, lowercase.
+          - name: seller
+            description: Seller address, lowercase.
+          - name: buyer
+            description: Buyer address, lowercase.
+          - name: total_price
+            description: MANA raw price, decimal(38,0).
+          - name: expires_at
+            description: Order expiry (decoded from unix milliseconds).
+          - name: bronze_extracted_at
+            description: Extraction timestamp inherited from bronze.
+          - name: decoded_at
+            description: Timestamp of the decode Lambda run.
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
+
+      - name: ethereum_wyvern_sales
+        description: >
+          OpenSea Wyvern OrdersMatched events (2018-11-06 to 2022-08-01).
+          Append-only; dedup downstream by latest decoded_at.
+          Partitioned by dt.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: wyvern_address
+            description: Wyvern exchange contract that emitted the event, lowercase.
+          - name: buy_hash
+            description: Zero hash when the match came from a listing (maker sells).
+          - name: sell_hash
+            description: Sell-side order hash.
+          - name: maker
+            description: Maker address, lowercase.
+          - name: taker
+            description: Taker address, lowercase.
+          - name: price
+            description: Raw price in the payment token, decimal(38,0).
+          - name: metadata
+            description: Order metadata word.
+          - name: bronze_extracted_at
+            description: Extraction timestamp inherited from bronze.
+          - name: decoded_at
+            description: Timestamp of the decode Lambda run.
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
+
+      - name: ethereum_seaport_sales
+        description: >
+          OpenSea Seaport OrderFulfilled events (from 2022-06-03), one row
+          per order with NFT and payment legs as parallel arrays.
+          Append-only; dedup downstream by latest decoded_at.
+          Partitioned by dt.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: seaport_address
+            description: Seaport contract that emitted the event, lowercase.
+          - name: order_hash
+            description: Fulfilled order hash.
+          - name: offerer
+            description: Order offerer, lowercase.
+          - name: recipient
+            description: Order recipient, lowercase.
+          - name: order_side
+            description: listing or bid.
+          - name: buyer
+            description: Buyer address, lowercase.
+          - name: seller
+            description: Seller address, lowercase; NULL when not identifiable.
+          - name: nft_contract_addresses
+            description: Array of NFT contracts, parallel to the other nft_* arrays.
+          - name: nft_token_ids
+            description: Array of decimal-string token ids.
+          - name: nft_quantities
+            description: Array of decimal(38,0).
+          - name: nft_froms
+            description: Array of sender addresses.
+          - name: nft_tos
+            description: Array of recipient addresses.
+          - name: payment_currencies
+            description: Array of payment token addresses; zero address = native ETH.
+          - name: payment_amounts
+            description: Array of decimal(38,0).
+          - name: payment_recipients
+            description: Array of payment recipients.
+          - name: bronze_extracted_at
+            description: Extraction timestamp inherited from bronze.
+          - name: decoded_at
+            description: Timestamp of the decode Lambda run.
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).
+
+      - name: ethereum_marketplace_trades
+        description: >
+          Decentraland off-chain marketplace Traded events (from
+          2024-12-21), one row per trade with NFT and payment legs as
+          parallel arrays. Append-only; dedup downstream by latest
+          decoded_at. Partitioned by dt.
+        columns:
+          - name: transaction_hash
+            description: Transaction hash.
+          - name: log_index
+            description: Log position within the transaction's block.
+          - name: block_timestamp
+            description: Block timestamp (UTC).
+          - name: marketplace_address
+            description: Marketplace contract that emitted the event, lowercase.
+          - name: trade_id
+            description: Trade id.
+          - name: caller
+            description: Transaction caller, lowercase.
+          - name: signer
+            description: Off-chain order signer, lowercase.
+          - name: order_side
+            description: Trade side.
+          - name: buyer
+            description: Buyer address, lowercase.
+          - name: seller
+            description: Seller address, lowercase.
+          - name: nft_contract_addresses
+            description: Array of NFT contracts, parallel to the other nft_* arrays.
+          - name: nft_token_ids
+            description: Array of decimal-string token ids.
+          - name: nft_asset_types
+            description: Array of asset type codes, bigint.
+          - name: nft_beneficiaries
+            description: Array of NFT beneficiary addresses.
+          - name: payment_currencies
+            description: Array of payment token addresses.
+          - name: payment_amounts
+            description: Array of decimal(38,0).
+          - name: payment_asset_types
+            description: Array of asset type codes, bigint.
+          - name: payment_beneficiaries
+            description: Array of payment beneficiary addresses.
+          - name: bronze_extracted_at
+            description: Extraction timestamp inherited from bronze.
+          - name: decoded_at
+            description: Timestamp of the decode Lambda run.
+          - name: dt
+            description: Block date partition (YYYY-MM-DD).

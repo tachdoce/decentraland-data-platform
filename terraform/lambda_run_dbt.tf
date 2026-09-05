@@ -151,7 +151,7 @@ resource "aws_lambda_function" "run_dbt" {
   image_uri     = "${aws_ecr_repository.run_dbt.repository_url}@${data.aws_ecr_image.run_dbt.image_digest}"
   architectures = ["arm64"] # native build on Apple Silicon, cheaper on Lambda
 
-  timeout     = 300
+  timeout     = 900
   memory_size = 1024
 
   environment {

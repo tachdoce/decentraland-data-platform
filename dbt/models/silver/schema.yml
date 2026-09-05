@@ -120,3 +120,71 @@ models:
       - name: dt
         data_tests:
           - not_null
+
+  - name: sales
+    description: >
+      One row per token sold across the five Ethereum marketplaces
+      (legacy auctions, marketplace v2, wyvern, seaport, marketplace
+      trades). Grain: (chain_id, transaction_hash, log_index,
+      nft_contract_address, token_id). Partitioned by (marketplace, dt);
+      dedup by latest decoded_at per (dt, transaction_hash, log_index).
+    columns:
+      - name: transaction_hash
+        data_tests:
+          - not_null
+      - name: log_index
+        data_tests:
+          - not_null
+      - name: block_timestamp
+        data_tests:
+          - not_null
+      - name: buyer
+        data_tests:
+          - not_null
+      - name: seller
+        data_tests:
+          - not_null
+      - name: nft_contract_address
+        data_tests:
+          - not_null
+      - name: token_id
+        data_tests:
+          - not_null
+      - name: quantity
+        data_tests:
+          - not_null
+      - name: currency
+        description: Payment token address; zero address = native ETH.
+        data_tests:
+          - not_null
+      - name: total_amount_raw
+        data_tests:
+          - not_null
+      - name: royalty_amount_raw
+        description: >
+          Raw royalty amount. NULL only on seaport sales without an
+          identified seller.
+      - name: bronze_extracted_at
+      - name: decoded_at
+      - name: silver_processed_at
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+      - name: marketplace
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - ethereum_legacy_auctions
+                  - ethereum_marketplace_v2
+                  - ethereum_wyvern
+                  - ethereum_seaport
+                  - ethereum_marketplace_trades
+      - name: dt
+        data_tests:
+          - not_null
