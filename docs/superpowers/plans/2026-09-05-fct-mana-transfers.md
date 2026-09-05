@@ -31,7 +31,7 @@
 - Consumes: `silver.mana_transfers` (columns: `transaction_hash`, `log_index`, `block_timestamp`, `from_address`, `to_address`, `amount_raw` decimal(38,0), `silver_processed_at`, `chain_id`, `dt`), macros `max_partition_dt(this)` / `max_partition_dt_offset(this, n)`, var `mana_transfers_incremental_days` (shared with silver, default 10).
 - Produces: table `gold.fct_mana_transfers` partitioned by `dt`, used by Task 2 (seed build) and Task 3 (backfill).
 
-- [ ] **Step 1: Write the model**
+- [x] **Step 1: Write the model**
 
 Create `dbt/models/gold/fct_mana_transfers.sql`:
 
@@ -84,7 +84,7 @@ WHERE t.amount_raw > 0
 {% endif %}
 ```
 
-- [ ] **Step 2: Add the schema.yml entry**
+- [x] **Step 2: Add the schema.yml entry**
 
 Append to `dbt/models/gold/schema.yml`, after the `fct_nft_transfers` entry and before `dim_currency`, same indentation as the sibling models:
 
@@ -140,7 +140,7 @@ Append to `dbt/models/gold/schema.yml`, after the `fct_nft_transfers` entry and 
           - not_null
 ```
 
-- [ ] **Step 3: Verify the project parses and the compiled SQL looks right**
+- [x] **Step 3: Verify the project parses and the compiled SQL looks right**
 
 Run:
 ```bash
@@ -148,7 +148,7 @@ cd dbt && ../.venv/bin/dbt parse && ../.venv/bin/dbt compile --select fct_mana_t
 ```
 Expected: both succeed. Open `dbt/target/compiled/**/gold/fct_mana_transfers.sql` and confirm the WHERE ends in `AND t.dt < '2019-01-01'` (first build) and the amount line multiplies by `DECIMAL '0.000000000000000001'`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add dbt/models/gold/fct_mana_transfers.sql dbt/models/gold/schema.yml
@@ -164,14 +164,14 @@ git commit -m "feat: gold.fct_mana_transfers model and tests"
 - Consumes: the model from Task 1.
 - Produces: `gold.fct_mana_transfers` seeded with every `dt < '2019-01-01'`, tests green — the base the Task 3 backfill advances from.
 
-- [ ] **Step 1: Run the initial build (model + tests)**
+- [x] **Step 1: Run the initial build (model + tests)**
 
 ```bash
 cd dbt && ../.venv/bin/dbt build --select fct_mana_transfers
 ```
 Expected: model builds and all 11 tests PASS. If a test fails, STOP and investigate (superpowers:systematic-debugging) — do not proceed to backfill.
 
-- [ ] **Step 2: Verify the seed against silver in Athena**
+- [x] **Step 2: Verify the seed against silver in Athena**
 
 Run in the tagged workgroup (`decentraland-data-platform`):
 
@@ -191,7 +191,7 @@ SELECT
 ```
 Expected: `gold_rows = expected_rows`. If they differ, STOP and investigate.
 
-- [ ] **Step 3: Verify the conversion is exact on the seed**
+- [x] **Step 3: Verify the conversion is exact on the seed**
 
 ```sql
 SELECT
@@ -212,7 +212,7 @@ Expected: identical values, digit for digit. A mismatch means the conversion los
 - Consumes: seeded table from Task 2; var `mana_transfers_incremental_days`.
 - Produces: `gold.fct_mana_transfers` complete up to silver's max dt (2026-08-20 at spec time).
 
-- [ ] **Step 1: Advance in 100-day windows until reaching the frontier**
+- [x] **Step 1: Advance in 100-day windows until reaching the frontier**
 
 ~2790 days from 2018-12-31 to 2026-08-20 → ~28 runs (window capped at 100 by Athena's 100-partition INSERT limit). Run sequentially from `dbt/`:
 
@@ -225,7 +225,7 @@ done
 ```
 Expected: each run loads ≤100 new partitions and its tests PASS. If any run fails, STOP: `dbt build` inserts BEFORE tests run, so a failed run may leave its window loaded — fix the cause, then recover with `--full-refresh` + re-backfill (the proven recipe from fct_nft_transfers) rather than manual partition surgery.
 
-- [ ] **Step 2: Verify completeness in Athena**
+- [x] **Step 2: Verify completeness in Athena**
 
 ```sql
 SELECT MAX(dt) AS max_dt FROM "gold"."fct_mana_transfers$partitions";
@@ -259,14 +259,14 @@ ORDER BY s.yr;
 ```
 Expected: `row_diff = 0` AND `mana_diff = 0` for every year 2017–2026. A non-zero `mana_diff` with zero `row_diff` means precision loss — STOP.
 
-- [ ] **Step 3: Run the full test suite once over the finished table**
+- [x] **Step 3: Run the full test suite once over the finished table**
 
 ```bash
 cd dbt && ../.venv/bin/dbt test --select fct_mana_transfers
 ```
 Expected: all 11 tests PASS.
 
-- [ ] **Step 4: Commit plan checkboxes and report**
+- [x] **Step 4: Commit plan checkboxes and report**
 
 ```bash
 git add docs/superpowers/plans/2026-09-05-fct-mana-transfers.md
