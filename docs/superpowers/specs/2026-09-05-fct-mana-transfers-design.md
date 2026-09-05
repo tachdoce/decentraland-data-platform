@@ -105,4 +105,5 @@ front reaches silver's max dt (2026-08-20 at design time, ~28 runs).
 Final verification: yearly reconciliation vs
 `silver.mana_transfers WHERE amount_raw > 0` (expected diff 0) plus a
 spot check that `SUM(amount)` per year equals
-`SUM(amount_raw) * 10^-18` computed on silver.
+`SUM(amount_raw) * 10^-18` computed on silver, also filtered to
+`WHERE amount_raw > 0` so both sides compare the same rows.
