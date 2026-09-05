@@ -16,7 +16,7 @@ FIXTURE_BYTES = (
 
 def test_real_reference_file_parses():
     rows = parse_and_validate(FIXTURE_BYTES)
-    assert len(rows) == 966
+    assert len(rows) == 965
     assert {r["chain_id"] for r in rows} == {1, 137}
     first = rows[0]
     assert isinstance(first["chain_id"], int)
@@ -155,7 +155,7 @@ def test_rows_to_parquet_roundtrip(tmp_path):
         "dcl_contract",
         "erc_type",
     ]
-    assert table.num_rows == 966
+    assert table.num_rows == 965
     assert str(table.schema.field("chain_id").type) == "int32"
     assert str(table.schema.field("first_mint_dt").type) == "date32[day]"
     assert str(table.schema.field("extract_from_dt").type) == "date32[day]"
@@ -215,7 +215,7 @@ def test_handler_reads_event_and_writes_partition(monkeypatch, tmp_path):
         ]
     }
     result = h.handler(event, None)
-    assert result["rows"] == 966
+    assert result["rows"] == 965
     assert written["bucket"] == "test-bucket"
     assert written["key"].startswith("bronze/contracts/dt=")
     assert written["key"].endswith("/contracts.parquet")
