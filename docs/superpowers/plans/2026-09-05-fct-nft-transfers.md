@@ -31,7 +31,7 @@
 - Consumes: `silver.nft_transfers` (columns: `transaction_hash`, `log_index`, `block_timestamp`, `contract_address`, `token_id`, `quantity`, `from_address`, `to_address`, `silver_processed_at`, `chain_id`, `dt`), `gold.dim_nft_contracts` (`sk_contract`, `chain_id`, `contract_address`), macros `max_partition_dt(this)` / `max_partition_dt_offset(this, n)`, var `nft_transfers_incremental_days` (shared with silver, default 10).
 - Produces: table `gold.fct_nft_transfers` partitioned by `dt`, used by Task 2 (seed build) and Task 3 (backfill).
 
-- [ ] **Step 1: Write the model**
+- [x] **Step 1: Write the model**
 
 Create `dbt/models/gold/fct_nft_transfers.sql`:
 
@@ -84,7 +84,7 @@ WHERE t.dt < '2019-01-01'
 {% endif %}
 ```
 
-- [ ] **Step 2: Add the schema.yml entry**
+- [x] **Step 2: Add the schema.yml entry**
 
 Append to `dbt/models/gold/schema.yml` (after `fct_monthly_nft_prices`, before `dim_currency`, same indentation as the sibling models):
 
@@ -141,7 +141,7 @@ Append to `dbt/models/gold/schema.yml` (after `fct_monthly_nft_prices`, before `
           - not_null
 ```
 
-- [ ] **Step 3: Verify the project parses and the compiled SQL looks right**
+- [x] **Step 3: Verify the project parses and the compiled SQL looks right**
 
 Run:
 ```bash
@@ -149,7 +149,7 @@ cd dbt && dbt parse && dbt compile --select fct_nft_transfers
 ```
 Expected: both succeed. Open `dbt/target/compiled/**/gold/fct_nft_transfers.sql` and confirm the non-incremental branch ends in `WHERE t.dt < '2019-01-01'` (first build → no `$partitions` subquery yet).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add dbt/models/gold/fct_nft_transfers.sql dbt/models/gold/schema.yml
@@ -165,14 +165,14 @@ git commit -m "feat: gold.fct_nft_transfers model and tests"
 - Consumes: the model from Task 1.
 - Produces: `gold.fct_nft_transfers` seeded with every `dt < '2019-01-01'`, tests green — the base the Task 3 backfill advances from.
 
-- [ ] **Step 1: Run the initial build (model + tests)**
+- [x] **Step 1: Run the initial build (model + tests)**
 
 ```bash
 cd dbt && dbt build --select fct_nft_transfers
 ```
 Expected: model builds and all 12 tests PASS. If a test fails, STOP and investigate (superpowers:systematic-debugging) — do not proceed to backfill.
 
-- [ ] **Step 2: Verify the seed against silver in Athena**
+- [x] **Step 2: Verify the seed against silver in Athena**
 
 Run both queries in the tagged workgroup (as usual via the Athena console or `aws athena start-query-execution`):
 
@@ -197,7 +197,7 @@ SELECT
 ```
 Expected: `gold_rows = expected_rows`. If they differ, STOP and investigate.
 
-- [ ] **Step 3: Record the silver frontier for the backfill**
+- [x] **Step 3: Record the silver frontier for the backfill**
 
 ```sql
 SELECT MAX(dt) AS silver_max_dt FROM "silver"."nft_transfers$partitions";
@@ -213,7 +213,7 @@ Expected: `2026-08-20` (spec-time value; use whatever this returns as the Task 3
 - Consumes: seeded table from Task 2; var `nft_transfers_incremental_days`.
 - Produces: `gold.fct_nft_transfers` complete up to silver's max dt.
 
-- [ ] **Step 1: Advance in 100-day windows until reaching the frontier**
+- [x] **Step 1: Advance in 100-day windows until reaching the frontier**
 
 Athena INSERT writes at most 100 partitions per query, so the window var must stay ≤ 100. From 2018-12-31 to 2026-08-20 is ~2790 days → ~28 runs. Run sequentially (each run reads the previous max dt from `$partitions`):
 
@@ -227,7 +227,7 @@ done
 ```
 Expected: each run loads ≤100 new partitions and its tests PASS. Once the front passes silver's max dt, runs load 0 new partitions (the window compiles past the data) — stop the loop then. If any run fails, STOP: fix before re-running (insert_overwrite makes re-running the same window safe, but a partial INSERT retry can duplicate partitions — check `$partitions` for the failed window before retrying).
 
-- [ ] **Step 2: Verify completeness in Athena**
+- [x] **Step 2: Verify completeness in Athena**
 
 ```sql
 SELECT MAX(dt) AS max_dt FROM "gold"."fct_nft_transfers$partitions";
@@ -253,14 +253,14 @@ GROUP BY 1 ORDER BY 1;
 ```
 Expected: identical counts per year. If a year differs, find the offending dt range with the same query at month grain and re-run that window.
 
-- [ ] **Step 3: Run the full test suite once over the finished table**
+- [x] **Step 3: Run the full test suite once over the finished table**
 
 ```bash
 cd dbt && dbt test --select fct_nft_transfers
 ```
 Expected: all 12 tests PASS.
 
-- [ ] **Step 4: Commit plan checkboxes and report**
+- [x] **Step 4: Commit plan checkboxes and report**
 
 ```bash
 git add docs/superpowers/plans/2026-09-05-fct-nft-transfers.md
