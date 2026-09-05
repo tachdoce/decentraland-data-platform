@@ -121,6 +121,54 @@ models:
         data_tests:
           - not_null
 
+  - name: mana_transfers
+    description: >
+      MANA (ERC-20) Transfer events on Ethereum, deduplicated to the
+      latest decode and bronze extraction run per log (dual criterion:
+      decoded_at alone cannot separate bronze copies ingested by one
+      decode run). One row per (chain_id, transaction_hash, log_index).
+      amount_raw = 0 no-op transfers are kept; filtering belongs to
+      gold. Incremental, partitioned by (chain_id, dt); runs advance at
+      most mana_transfers_incremental_days (default 10) past max dt.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - transaction_hash
+              - log_index
+    columns:
+      - name: transaction_hash
+        data_tests:
+          - not_null
+      - name: log_index
+        data_tests:
+          - not_null
+      - name: block_timestamp
+        data_tests:
+          - not_null
+      - name: token_address
+        data_tests:
+          - not_null
+      - name: from_address
+        data_tests:
+          - not_null
+      - name: to_address
+        data_tests:
+          - not_null
+      - name: amount_raw
+        data_tests:
+          - not_null
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+      - name: dt
+        data_tests:
+          - not_null
+
   - name: sales
     description: >
       One row per token sold across the five Ethereum marketplaces
