@@ -140,6 +140,58 @@ models:
               config:
                 where: "month = '{{ var(\"month\", \"\") }}'"
 
+  - name: fct_nft_transfers
+    description: >
+      NFT transfers fact: one row per transferred token position for
+      curated ERC-721/1155 contracts, keyed by sk_contract. NOT unique
+      on (chain_id, transaction_hash, log_index): 1155 TransferBatch
+      explodes into one row per array element. INNER JOIN to
+      dim_nft_contracts is intentional (EstateProxy, erc_type 0, drops
+      out), and quantity = 0 rows (legal ERC-1155 no-op transfers) are
+      filtered. Full history from 2018 — no price dependency. Incremental,
+      partitioned by dt; runs advance at most
+      nft_transfers_incremental_days (default 10) past max dt.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          name: fct_nft_transfers_quantity_positive
+          arguments:
+            expression: "quantity > 0"
+    columns:
+      - name: transaction_hash
+        data_tests:
+          - not_null
+      - name: log_index
+        data_tests:
+          - not_null
+      - name: block_timestamp
+        data_tests:
+          - not_null
+      - name: from_address
+        data_tests:
+          - not_null
+      - name: to_address
+        data_tests:
+          - not_null
+      - name: sk_contract
+        data_tests:
+          - not_null
+      - name: token_id
+        data_tests:
+          - not_null
+      - name: quantity
+        data_tests:
+          - not_null
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+      - name: dt
+        data_tests:
+          - not_null
+
   - name: dim_currency
     description: >
       Payment-currency dimension. No surrogate key: facts join prices by
