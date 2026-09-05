@@ -312,13 +312,12 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Advance in windows until reaching the frontier**
 
-From 2019-02-01 to 2026-08-20 there are ~2,758 days. Run repeatedly (each run advances up to 365 days past the table's max dt and validates the loaded window):
+From 2019-02-01 to 2026-08-20 there are ~2,758 days. Run repeatedly with 90-day windows (user directive): each run advances up to 90 days past the table's max dt and validates the loaded window. If a run fails (e.g. Athena scan/workgroup limits), retry the same stretch with a smaller window — degrade 90 → 30 → 10 → 5 → 1 — and continue at the largest size that works.
 
 ```bash
 cd /Users/tachone/proyectos/Decentraland/dbt
-for i in 1 2 3 4 5 6 7 8; do
-  ../.venv/bin/dbt build --select fct_sales --vars '{sales_incremental_days: 365}' 2>&1 | tail -2
-done
+../.venv/bin/dbt build --select fct_sales --vars '{sales_incremental_days: 90}' 2>&1 | tail -2
+# repeat (~31 runs at 90 days) until max dt = 2026-08-20
 ```
 Expected: each iteration `Completed successfully`, `ERROR=0`. Runs past the frontier load only days token_prices covers (the INNER JOIN caps at 2026-08-20); once max dt hits 2026-08-20 further runs write zero new partitions and are harmless.
 
