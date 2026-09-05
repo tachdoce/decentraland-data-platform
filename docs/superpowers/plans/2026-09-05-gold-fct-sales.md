@@ -193,7 +193,7 @@ Run:
 cd /Users/tachone/proyectos/Decentraland/dbt
 ../.venv/bin/dbt parse 2>&1 | tail -5
 ```
-Expected: FAIL — `Compilation Error ... depends on a node named 'fct_sales' which was not found`.
+Expected: dbt does NOT hard-fail here (observed during execution): it drops the schema.yml patch for the missing model with a warning and defers the singular test's unresolved `ref` to compile time. Verify instead with `../.venv/bin/dbt ls --select fct_sales`, which must print `does not match any enabled nodes`.
 
 - [ ] **Step 3: Write the model**
 
