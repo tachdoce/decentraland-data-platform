@@ -31,6 +31,70 @@ models:
                 values: [721, 1155]
                 quote: false
 
+  - name: fct_sales
+    description: >
+      Sales fact: one row per token sold across the Ethereum marketplaces,
+      priced in USD with the sale-day quote. Grain: (chain_id,
+      transaction_hash, log_index, sk_contract, token_id). INNER JOINs to
+      dim_currency, token_prices and dim_nft_contracts are intentional:
+      only sales with a curated payment token and a price for the day are
+      published. Starts 2019-01-01, the first day token_prices covers;
+      2018 sales stay silver-only. Incremental, partitioned by dt; runs
+      advance at most sales_incremental_days (default 10) past max dt.
+    columns:
+      - name: transaction_hash
+        data_tests:
+          - not_null
+      - name: log_index
+        data_tests:
+          - not_null
+      - name: block_timestamp
+        data_tests:
+          - not_null
+      - name: buyer
+        data_tests:
+          - not_null
+      - name: seller
+        data_tests:
+          - not_null
+      - name: sk_contract
+        data_tests:
+          - not_null
+      - name: token_id
+        data_tests:
+          - not_null
+      - name: quantity
+        data_tests:
+          - not_null
+      - name: currency_symbol
+        data_tests:
+          - not_null
+      - name: total_amount
+        data_tests:
+          - not_null
+      - name: royalty_amount
+        data_tests:
+          - not_null
+      - name: usd_total_amount
+        data_tests:
+          - not_null
+      - name: usd_royalty_amount
+        data_tests:
+          - not_null
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+      - name: marketplace
+        data_tests:
+          - not_null
+      - name: dt
+        data_tests:
+          - not_null
+
   - name: dim_currency
     description: >
       Payment-currency dimension. No surrogate key: facts join prices by
