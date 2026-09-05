@@ -56,10 +56,20 @@ not count as one expensive sale.
 
 ## Not wired to the pipeline
 
-- `run-dbt`'s daily selector and every state machine stay untouched;
-  no EventBridge rule is added.
-- To run it on AWS instead of locally, invoke the existing `run-dbt`
-  Lambda manually with this model's selector and the `month` var.
+- No EventBridge rule and no state machine changes.
+- The automatic selectors are NOT untouched-by-luck: two of them use
+  downstream graphs that reach `fct_sales`
+  (`source:bronze.token_prices+`, `source:bronze.erc20_tokens+`) and
+  would pull this model in and fail on the missing var. Fix (validated
+  with the user): the model carries `tags=['manual']` and the `run-dbt`
+  Lambda always appends `--exclude tag:manual` to every build.
+- Since `--exclude` beats direct selection, the model runs **only via
+  local dbt** (`dbt build --select fct_monthly_nft_prices --vars ...`),
+  which matches how backfills are run anyway. No `vars` support is
+  added to the Lambda (YAGNI).
+- The var guard raises only under `{% if execute %}`: at parse time
+  every model is rendered on every dbt invocation, and an unconditional
+  raise would break the daily pipelines.
 
 ## Testing (`models/gold/schema.yml`)
 
