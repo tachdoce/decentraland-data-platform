@@ -95,6 +95,51 @@ models:
         data_tests:
           - not_null
 
+  - name: fct_monthly_nft_prices
+    description: >
+      Monthly NFT aggregate per contract: USD median unit price
+      (usd_total_amount / quantity) plus volume. Grain: (month,
+      sk_contract). On-demand only: mandatory 'month' var (YYYY-MM)
+      names the single partition each run replaces; tag:manual keeps it
+      out of every automatic run-dbt selection, so it runs only via
+      local dbt. Tests are bounded to the partition just loaded.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - month
+              - sk_contract
+          config:
+            where: "month = '{{ var(\"month\", \"\") }}'"
+      - dbt_utils.expression_is_true:
+          name: fct_monthly_nft_prices_median_non_negative
+          arguments:
+            expression: "usd_median_unit_price >= 0"
+          config:
+            where: "month = '{{ var(\"month\", \"\") }}'"
+      - dbt_utils.expression_is_true:
+          name: fct_monthly_nft_prices_quantity_positive
+          arguments:
+            expression: "nft_quantity > 0"
+          config:
+            where: "month = '{{ var(\"month\", \"\") }}'"
+    columns:
+      - name: sk_contract
+        data_tests:
+          - not_null:
+              config:
+                where: "month = '{{ var(\"month\", \"\") }}'"
+      - name: month
+        data_tests:
+          - not_null:
+              config:
+                where: "month = '{{ var(\"month\", \"\") }}'"
+      - name: usd_median_unit_price
+        data_tests:
+          - not_null:
+              config:
+                where: "month = '{{ var(\"month\", \"\") }}'"
+
   - name: dim_currency
     description: >
       Payment-currency dimension. No surrogate key: facts join prices by

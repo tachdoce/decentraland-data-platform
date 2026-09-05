@@ -44,6 +44,8 @@ def test_default_selector(env, monkeypatch):
     assert args[:3] == ["build", "--select", "source:bronze.contracts+"]
     assert "--project-dir" in args and "/var/task/dbt" in args
     assert "--target-path" in args and "/tmp/dbt-target" in args
+    assert "--exclude" in args
+    assert args[args.index("--exclude") + 1] == "tag:manual"
     assert result == {"select": "source:bronze.contracts+"}
 
 
@@ -54,6 +56,19 @@ def test_selector_override(env, monkeypatch):
 
     assert FakeDbtRunner.calls[0][:3] == ["build", "--select", "dim_contracts"]
     assert result == {"select": "dim_contracts"}
+    assert "--exclude" in FakeDbtRunner.calls[0]
+
+
+def test_manual_tag_always_excluded(env, monkeypatch):
+    # Models tagged 'manual' (e.g. fct_monthly_nft_prices) need a mandatory
+    # var: any automatic selection reaching them would fail. The Lambda must
+    # exclude the tag no matter which selector the event carries.
+    _wire(monkeypatch)
+
+    h.handler({"select": "source:bronze.token_prices+"}, None)
+
+    args = FakeDbtRunner.calls[0]
+    assert args[args.index("--exclude") + 1] == "tag:manual"
 
 
 def test_dbt_failure_raises(env, monkeypatch):
