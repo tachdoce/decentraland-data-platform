@@ -85,7 +85,12 @@ resource "aws_sfn_state_machine" "contracts_on_push" {
       RunDbt = {
         Type       = "Task"
         Resource   = aws_lambda_function.run_dbt.arn
-        Parameters = {} # default selector: source:bronze.contracts+
+        # Dimensions only (models + their tests). Facts like silver.sales
+        # are deliberately excluded: a CSV push refreshes dimensions, not
+        # the heavy incremental models.
+        Parameters = {
+          select = "dim_contracts dim_erc20_tokens dim_nft_contracts dim_currency"
+        }
         ResultPath = "$.dbt"
         Retry = [{
           ErrorEquals = [

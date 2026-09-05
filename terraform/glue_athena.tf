@@ -13,6 +13,11 @@ resource "aws_glue_catalog_database" "staging" {
   tags = local.base_tags
 }
 
+resource "aws_glue_catalog_database" "gold" {
+  name = "gold"
+  tags = local.base_tags
+}
+
 resource "aws_athena_workgroup" "main" {
   name = "decentraland-data-platform"
   tags = local.base_tags

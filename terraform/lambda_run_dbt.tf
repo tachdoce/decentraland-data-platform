@@ -79,12 +79,17 @@ resource "aws_iam_role_policy" "run_dbt" {
         Resource = [
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:catalog",
           aws_glue_catalog_database.bronze.arn,
+          aws_glue_catalog_database.staging.arn,
           aws_glue_catalog_database.silver.arn,
+          aws_glue_catalog_database.gold.arn,
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/bronze/*",
+          "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/staging/*",
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/silver/*",
+          "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/gold/*",
         ]
       },
-      # dbt materializes silver views: create/replace/drop table metadata
+      # dbt materializes silver views and gold tables: create/replace/drop
+      # table metadata
       {
         Effect = "Allow"
         Action = [
@@ -96,7 +101,9 @@ resource "aws_iam_role_policy" "run_dbt" {
         Resource = [
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:catalog",
           aws_glue_catalog_database.silver.arn,
+          aws_glue_catalog_database.gold.arn,
           "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/silver/*",
+          "arn:aws:glue:us-east-1:${data.aws_caller_identity.current.account_id}:table/gold/*",
         ]
       },
       {
@@ -111,6 +118,9 @@ resource "aws_iam_role_policy" "run_dbt" {
           "${aws_s3_bucket.lake.arn}/bronze/contracts/*",
           "${aws_s3_bucket.lake.arn}/bronze/erc20_tokens/*",
           "${aws_s3_bucket.lake.arn}/bronze/token_prices/*",
+          "${aws_s3_bucket.lake.arn}/bronze/ethereum_logs/*",
+          "${aws_s3_bucket.lake.arn}/bronze/polygon_logs/*",
+          "${aws_s3_bucket.lake.arn}/staging/*",
         ]
       },
       {
