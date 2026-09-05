@@ -1,5 +1,6 @@
 dbt/target
 dbt/logs
+dbt/dbt_packages
 **/__pycache__
 .venv
 terraform

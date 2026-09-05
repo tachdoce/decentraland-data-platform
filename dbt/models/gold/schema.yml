@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: dim_nft_contracts
+    description: >
+      NFT contract dimension: curated contracts restricted to ERC-721/1155.
+      One row per (chain_id, contract_address), keyed by sk_contract.
+    columns:
+      - name: sk_contract
+        data_tests:
+          - not_null
+          - unique
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 137]
+                quote: false
+      - name: contract_address
+        data_tests:
+          - not_null
+      - name: dcl_contract
+        data_tests:
+          - not_null
+      - name: erc_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [721, 1155]
+                quote: false
+
+  - name: dim_currency
+    description: >
+      Payment-currency dimension. No surrogate key: facts join prices by
+      currency_symbol, since one currency can live on N chains with the
+      same quote. One row per (chain_id, contract_address).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - chain_id
+              - contract_address
+    columns:
+      - name: chain_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 137]
+                quote: false
+      - name: contract_address
+        data_tests:
+          - not_null
+      - name: name
+        data_tests:
+          - not_null
+      - name: currency_symbol
+        data_tests:
+          - not_null
+      - name: decimals
+        data_tests:
+          - not_null
+      - name: fetch_price
+        data_tests:
+          - not_null
