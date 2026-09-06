@@ -27,7 +27,14 @@ npm run dev         # dev server at localhost:3000
 npm run sources && npm run build   # static site in ./build
 ```
 
-Deployment to GitHub Pages with a daily rebuild is planned (dash-3).
+## Deployment
+
+`.github/workflows/deploy-dashboard.yml` builds the site and publishes it to
+GitHub Pages. It runs **only** on manual dispatch (Actions → deploy-dashboard
+→ Run workflow) or when a merge to main touches `dashboard/` — no schedule, so
+published data stays as of the last run (the home page shows build time and
+data coverage). AWS access uses the OIDC role from `terraform/github_oidc.tf`;
+no stored credentials.
 
 ## Structure
 
