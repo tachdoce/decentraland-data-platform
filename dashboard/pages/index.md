@@ -2,6 +2,12 @@
 
 Monthly NFT prices from `gold.fct_monthly_nft_prices`, joined with `gold.dim_nft_contracts`.
 
+```sql freshness
+SELECT MAX(month) AS last_month FROM gold.monthly_nft_prices
+```
+
+<LastRefreshed prefix="Site built"/> — data through <Value data={freshness} column=last_month fmt="mmm yyyy"/>.
+
 ```sql collections
 SELECT
     contract_name,
