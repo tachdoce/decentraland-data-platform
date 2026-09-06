@@ -107,8 +107,9 @@ All tests bounded to the partition just loaded
 - `not_null` on `wallet_address`, `month`.
 - `dbt_utils.unique_combination_of_columns` on
   `(month, wallet_address)`.
-- `dbt_utils.expression_is_true`: `mana_balance > 0.001` (only rows
-  where it is not NULL survive the HAVING).
+- `dbt_utils.expression_is_true`: `mana_balance >= 0` (NULL rows pass
+  by SQL semantics; `> 0.001` would be wrong because `ROUND(_, 2)` can
+  leave 0.00 for sums just above the dust threshold).
 
 ## Out of scope
 
