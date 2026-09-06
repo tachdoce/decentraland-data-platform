@@ -41,8 +41,13 @@ resource "aws_iam_role" "github_actions_dashboard" {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
+          # GitHub embeds immutable account/repo ids in the sub claim
+          # (owner@id/repo@id); both forms pin this exact repo.
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:*"
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:${local.github_repo}:*",
+              "repo:tachdoce@285140327/decentraland-data-platform@1341282155:*",
+            ]
           }
         }
       }
