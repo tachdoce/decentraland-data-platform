@@ -1,0 +1,30 @@
+{
+  "name": "decentraland-dashboard",
+  "version": "0.0.1",
+  "scripts": {
+    "build": "evidence build",
+    "build:strict": "evidence build:strict",
+    "dev": "evidence dev --open /",
+    "test": "evidence build",
+    "sources": "evidence sources",
+    "sources:strict": "evidence sources --strict",
+    "preview": "evidence preview",
+    "s3-secret": "node -e \"const {DuckDBInstance}=require('@duckdb/node-api');DuckDBInstance.create(':memory:').then(async i=>{const c=await i.connect();await c.run(\\\"CREATE OR REPLACE PERSISTENT SECRET aws_chain (TYPE s3, PROVIDER credential_chain, REGION 'us-east-1')\\\");console.log('S3 secret stored in ~/.duckdb');})\""
+  },
+  "engines": {
+    "npm": ">=7.0.0",
+    "node": ">=18.0.0"
+  },
+  "type": "module",
+  "dependencies": {
+    "@evidence-dev/core-components": "^5.4.2",
+    "@evidence-dev/duckdb": "^2.0.1",
+    "@evidence-dev/evidence": "^40.1.8"
+  },
+  "overrides": {
+    "jsonwebtoken": "9.0.0",
+    "trim@<0.0.3": ">0.0.3",
+    "sqlite3": "5.1.5",
+    "axios": "^1.7.4"
+  }
+}
