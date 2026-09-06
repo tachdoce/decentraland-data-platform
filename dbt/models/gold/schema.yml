@@ -276,3 +276,42 @@ models:
       - name: fetch_price
         data_tests:
           - not_null
+
+  - name: fct_monthly_wallet_snapshot
+    description: >
+      Monthly wallet-state snapshot: one row per (month, wallet_address)
+      for wallets that received a DCL NFT or MANA at least once before
+      the month started. month = state at the START of that month
+      (cutoff dt < month-01); NFT valuations use the previous month's
+      fct_monthly_nft_prices. mana_balance is NULL below the 0.001 dust
+      threshold. On-demand only: mandatory 'month' var names the single
+      partition each run replaces; tag:manual keeps it out of automatic
+      runs. Tests are bounded to the partition just loaded.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - month
+              - wallet_address
+          config:
+            where: "month = '{{ var(\"month\", \"\") }}'"
+      - dbt_utils.expression_is_true:
+          name: fct_monthly_wallet_snapshot_balance_non_negative
+          arguments:
+            # HAVING keeps SUM(amount) > 0.001, but ROUND(_, 2) can
+            # legally leave 0.00 for sums in (0.001, 0.005) — so the
+            # test only asserts non-negativity.
+            expression: "mana_balance >= 0"
+          config:
+            where: "month = '{{ var(\"month\", \"\") }}'"
+    columns:
+      - name: wallet_address
+        data_tests:
+          - not_null:
+              config:
+                where: "month = '{{ var(\"month\", \"\") }}'"
+      - name: month
+        data_tests:
+          - not_null:
+              config:
+                where: "month = '{{ var(\"month\", \"\") }}'"
