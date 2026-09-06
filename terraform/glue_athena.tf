@@ -23,7 +23,11 @@ resource "aws_athena_workgroup" "main" {
   tags = local.base_tags
 
   configuration {
-    bytes_scanned_cutoff_per_query = 1073741824 # 1 GB cost safety net
+    # 20 GB cost safety net (~$0.10 max per query at $5/TB). Raised from
+    # 1 GB for fct_monthly_wallet_snapshot: a cumulative snapshot that
+    # scans the full fct_nft_transfers/fct_mana_transfers history (with
+    # multiple references) every monthly run.
+    bytes_scanned_cutoff_per_query = 21474836480
 
     # Must NOT enforce: when the workgroup forces its output location,
     # dbt-athena omits external_location from CTAS and tables land under
